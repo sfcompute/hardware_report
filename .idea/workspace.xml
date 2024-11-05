@@ -7,7 +7,12 @@
     <cargoProject FILE="$PROJECT_DIR$/Cargo.toml" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="e0e5b09d-07b9-4a14-8acb-d95f7fe73b90" name="Changes" comment="">
+    <list default="true" id="e0e5b09d-07b9-4a14-8acb-d95f7fe73b90" name="Changes" comment="added numa devices">
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Cargo.lock" beforeDir="false" afterPath="$PROJECT_DIR$/Cargo.lock" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Cargo.toml" beforeDir="false" afterPath="$PROJECT_DIR$/Cargo.toml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Readme.md" beforeDir="false" afterPath="$PROJECT_DIR$/Readme.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/build/release/hardware_report-linux-x86_64" beforeDir="false" afterPath="$PROJECT_DIR$/build/release/hardware_report-linux-x86_64" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/main.rs" beforeDir="false" afterPath="$PROJECT_DIR$/src/main.rs" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
@@ -109,11 +114,24 @@
       <option name="presentableId" value="Default" />
       <updated>1730834885388</updated>
       <workItem from="1730834886489" duration="728000" />
-      <workItem from="1730838989853" duration="180000" />
+      <workItem from="1730838989853" duration="4785000" />
     </task>
+    <task id="LOCAL-00001" summary="added numa devices">
+      <option name="closed" value="true" />
+      <created>1730839183624</created>
+      <option name="number" value="00001" />
+      <option name="presentableId" value="LOCAL-00001" />
+      <option name="project" value="LOCAL" />
+      <updated>1730839183624</updated>
+    </task>
+    <option name="localTasksCounter" value="2" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
     <option name="version" value="3" />
+  </component>
+  <component name="VcsManagerConfiguration">
+    <MESSAGE value="added numa devices" />
+    <option name="LAST_COMMIT_MESSAGE" value="added numa devices" />
   </component>
 </project>
