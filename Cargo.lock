@@ -283,6 +283,7 @@ dependencies = [
  "assert_fs",
  "clap",
  "env_logger",
+ "libc",
  "log",
  "predicates",
  "regex",

@@ -1,41 +1,42 @@
 # Hardware Report
 A Rust utility that automatically collects and reports detailed hardware information from Linux servers, outputting the data in TOML format.
 
+## ⚠️ IMPORTANT BUILD REQUIREMENT ⚠️
+**DOCKER MUST BE RUNNING ON YOUR LOCAL MACHINE TO COMPILE FOR LINUX ON NON-LINUX SYSTEMS**
+**WITHOUT DOCKER RUNNING, THE BUILD WILL FAIL WHEN EXECUTING `make linux` ON macOS OR WINDOWS**
+
 ## Features
 - Comprehensive system information collection including:
-  - System summary with BIOS and chassis information
-  - Basic system details (hostname, IP addresses)
-  - BMC (Baseboard Management Controller) information
-  - CPU specifications (model, cores, threads, speed)
-  - Memory details (size, type, speed, individual modules)
-  - Storage information (devices, size, model)
-  - GPU details (when NVIDIA GPUs are present)
-  - Network interface information
-  - Infiniband configuration (if available)
-  - Filesystem information and mount points
+    - System summary with BIOS and chassis information
+    - Basic system details (hostname, IP addresses)
+    - BMC (Baseboard Management Controller) information
+    - CPU specifications (model, cores, threads, speed)
+    - Memory details (size, type, speed, individual modules)
+    - Storage information (devices, size, model)
+    - GPU details (when NVIDIA GPUs are present)
+    - Network interface information
+    - Infiniband configuration (if available)
+    - Filesystem information and mount points
 
 ## Prerequisites
-- Linux operating system
+### Required Software
 - Rust toolchain (cargo, rustc)
-- Make (for using the Makefile)
-- Docker (optional, for cross-compilation)
-- The following system utilities must be installed:
-  - `hostname`
-  - `ip`
-  - `lscpu`
-  - `dmidecode` (requires root privileges)
-  - `lsblk`
-  - `df`
-  - `ethtool`
-  - `ipmitool` (for BMC information)
-  - `nvidia-smi` (optional, for GPU information)
-  - `ibstat` (optional, for Infiniband information)
+- Make
+- **Docker (REQUIRED for cross-compilation on non-Linux systems)**
+
+### Optional System Utilities
+- `nvidia-smi` (required for NVIDIA GPU information)
+- `ipmitool` (required for BMC information)
+- `ethtool` (required for network interface details)
 
 ## Building
 The project includes a Makefile that supports building for both Linux and macOS targets.
 
 ### Building for Linux
 ```bash
+# Ensure Docker is running first!
+docker ps  # Should show Docker is running
+
 # Build Linux binary
 make linux
 
@@ -45,7 +46,7 @@ build/release/hardware_report-linux-x86_64
 
 ### Building for macOS (if on a Mac)
 ```bash
-# Build macOS binary
+# No Docker required for native macOS build
 make macos
 
 # The binary will be available at:
@@ -54,6 +55,9 @@ build/release/hardware_report-macos-[architecture]
 
 ### Building for all supported platforms
 ```bash
+# Ensure Docker is running first!
+docker ps  # Should show Docker is running
+
 # Build for all supported platforms
 make all
 ```
@@ -73,13 +77,13 @@ sudo ./build/release/hardware_report-macos-x86_64 # For Intel Macs
 
 The program will:
 1. Display a summary of system information including:
-   - Memory configuration
-   - Storage capacity
-   - BIOS information
-   - Chassis details
-   - GPU count
-   - Network interface count
-   - Filesystem information
+    - Memory configuration
+    - Storage capacity
+    - BIOS information
+    - Chassis details
+    - GPU count
+    - Network interface count
+    - Filesystem information
 2. Generate a detailed `server_config.toml` file in the current directory
 
 ## Output Format

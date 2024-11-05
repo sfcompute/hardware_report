@@ -19,6 +19,7 @@ log = "0.4" # For logging
 env_logger = "0.11.5" # For logging implementation
 regex = "1.11.1"
 toml = "0.8.19"
+libc = "0.2.161"
 
 [dev-dependencies]
 tempfile = "3.8"   # For temporary file handling in tests

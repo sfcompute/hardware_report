@@ -20,6 +20,18 @@ use std::error::Error;
 use std::process::Command;
 use toml;
 
+/// CPU topology information
+#[derive(Debug, Serialize, Deserialize)]
+struct CpuTopology {
+    total_cores: u32,
+    total_threads: u32,
+    sockets: u32,
+    cores_per_socket: u32,
+    threads_per_core: u32,
+    numa_nodes: u32,
+    cpu_model: String,
+}
+
 /// Summary of key system components
 #[derive(Debug, Serialize, Deserialize)]
 struct SystemSummary {
@@ -39,6 +51,8 @@ struct SystemSummary {
     total_gpus: usize,
     /// Total number of network interfaces
     total_nics: usize,
+    /// NUMA topology information
+    numa_topology: HashMap<String, NumaNode>, 
 }
 
 /// BIOS information
@@ -156,15 +170,48 @@ struct GpuInfo {
 /// Represents a GPU device.
 #[derive(Debug, Serialize, Deserialize)]
 struct GpuDevice {
-    /// GPU index.
+    /// GPU index
     index: u32,
-    /// GPU name.
+    /// GPU name
     name: String,
-    /// GPU UUID.
+    /// GPU UUID
     uuid: String,
-    /// Total GPU memory.
+    /// Total GPU memory
     memory: String,
+    /// PCI ID (vendor:device)
+    pci_id: String,
+    /// Vendor name
+    vendor: String,
+    /// NUMA node
+    numa_node: Option<i32>, 
 }
+
+/// Represents a NUMA node
+#[derive(Debug, Serialize, Deserialize)]
+struct NumaNode {
+    /// Node ID
+    id: i32,
+    /// CPU list
+    cpus: Vec<u32>,
+    /// Memory size
+    memory: String,
+    /// Devices attached to this node
+    devices: Vec<NumaDevice>,
+    /// distances to other nodse (node_id _> distance)
+    distances: HashMap<String, u32>,
+}
+
+/// Represents a device attached to a NUMA node
+#[derive(Debug, Serialize, Deserialize)]
+struct NumaDevice {
+    /// Device type (GPU, NIC, etc.)
+    type_: String,
+    /// PCI ID
+    pci_id: String,
+    /// Device name
+    name: String,
+}
+
 
 /// Represents network information.
 #[derive(Debug, Serialize, Deserialize)]
@@ -188,6 +235,11 @@ struct NetworkInterface {
     speed: Option<String>,
     /// Interface type.
     type_: String,
+    vendor: String,
+    model: String,
+    pci_id: String,
+    numa_node: Option<i32>,
+    
 }
 
 /// Represents Infiniband information.
@@ -210,15 +262,270 @@ struct IbInterface {
     rate: String,
 }
 
+struct NumaInfo {
+    nodes: Vec<NumaNode>
+}
+
 impl ServerInfo {
+
+    /// Checks for required system dependencies and returns any missing ones
+    fn check_dependencies() -> Result<Vec<&'static str>, Box<dyn Error>> {
+        let required_packages = vec![
+            ("numactl", "NUMA topology information"),
+            ("lspci", "PCI device information"),
+            ("ethtool", "Network interface information"),
+            ("dmidecode", "System hardware information"),
+        ];
+
+        let mut missing_packages = Vec::new();
+
+        // Check which packages are missing
+        for (package, purpose) in &required_packages {
+            let status = Command::new("which")
+                .arg(package)
+                .output()?;
+
+            if !status.status.success() {
+                missing_packages.push(*package);
+                eprintln!("Missing {}: required for {}", package, purpose);
+            }
+        }
+
+        if !missing_packages.is_empty() {
+            eprintln!("\nSome required packages are missing. Please install them using your package manager:");
+            eprintln!("\nFor Debian/Ubuntu:");
+            eprintln!("  apt-get install {}", missing_packages.join(" "));
+            eprintln!("\nFor RHEL/CentOS/Fedora:");
+            eprintln!("  dnf install {}", missing_packages.join(" "));
+            eprintln!("\nThen run this program again.\n");
+        }
+
+        Ok(missing_packages)
+    }
     /// Gets hostname of the server
     fn get_hostname() -> Result<String, Box<dyn Error>> {
         let output = Command::new("hostname").output()?;
         Ok(String::from_utf8(output.stdout)?.trim().to_string())
     }
 
+    /// Gets PCI information for a device
+    fn get_pci_info(pci_addr: &str) -> Result<(String, String, String), Box<dyn Error>> {
+        // Run lspci with verbose output and machine-readable format
+        let output = Command::new("lspci")
+            .args(&["-vmm", "-s", pci_addr])
+            .output()?;
+
+        let output_str = String::from_utf8(output.stdout)?;
+        let mut vendor = String::new();
+        let mut device = String::new();
+        let mut vendor_id = String::new();
+        let mut device_id = String::new();
+
+        for line in output_str.lines() {
+            let parts: Vec<&str> = line.split(':').collect();
+            if parts.len() >= 2 {
+                let value = parts[1].trim();
+                match parts[0].trim() {
+                    "Vendor" => vendor = value.to_string(),
+                    "Device" => device = value.to_string(),
+                    "SVendor" => if vendor.is_empty() { vendor = value.to_string() },
+                    "SDevice" => if device.is_empty() { device = value.to_string() },
+                    _ => {}
+                }
+            }
+        }
+
+        // Get vendor and device IDs using -n flag
+        let id_output = Command::new("lspci")
+            .args(&["-n", "-s", pci_addr])
+            .output()?;
+
+        let id_str = String::from_utf8(id_output.stdout)?;
+        if let Some(line) = id_str.lines().next() {
+            if let Some(ids) = line.split_whitespace().nth(2) {
+                let parts: Vec<&str> = ids.split(':').collect();
+                if parts.len() >= 2 {
+                    vendor_id = parts[0].to_string();
+                    device_id = parts[1].to_string();
+                }
+            }
+        }
+
+        let pci_id = format!("{}:{}", vendor_id, device_id);
+        Ok((vendor, device, pci_id))
+    }
+
+
+    /// Gets NUMA node for a PCI device
+    fn get_numa_node(pci_addr: &str) -> Option<i32> {
+        if let Ok(path) = std::fs::read_link(format!("/sys/bus/pci/devices/{}/numa_node", pci_addr)) {
+            if let Ok(content) = std::fs::read_to_string(path) {
+                if let Ok(node) = content.trim().parse() {
+                    return Some(node);
+                }
+            }
+        }
+        None
+    }
+
+    fn collect_numa_topology() -> Result<HashMap<String, NumaNode>, Box<dyn Error>> {
+        let mut nodes = HashMap::new();
+        let mut collecting_distances = false;
+
+        // Get NUMA information using numactl
+        let output = Command::new("numactl")
+            .args(&["--hardware"])
+            .output()?;
+
+        let output_str = String::from_utf8(output.stdout)?;
+
+        for line in output_str.lines() {
+            if line.starts_with("node ") && line.contains("size:") {
+                // Parse node and memory information
+                let parts: Vec<&str> = line.split_whitespace().collect();
+                if parts.len() >= 4 {
+                    if let Ok(id) = parts[1].parse::<i32>() {
+                        let memory = format!("{} {}", parts[3], parts[4]);
+
+                        // Create new node entry
+                        nodes.insert(id.to_string(), NumaNode {
+                            id,
+                            memory,
+                            cpus: Vec::new(),
+                            distances: HashMap::new(),
+                            devices: Vec::new(),
+                        });
+                    }
+                }
+            } else if line.contains("node distances:") {
+                collecting_distances = true;
+                continue;
+            } else if collecting_distances && line.trim().starts_with("node") {
+                // Parse distance information
+                let parts: Vec<&str> = line.split_whitespace().collect();
+                if parts.len() > 2 {
+                    if let Ok(from_node) = parts[1].parse::<i32>() {
+                        for (i, dist_str) in parts[2..].iter().enumerate() {
+                            if let Ok(distance) = dist_str.parse::<u32>() {
+                                if let Some(node) = nodes.get_mut(&from_node.to_string()) {
+                                    node.distances.insert(i.to_string(), distance);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // Get CPU to node mapping
+        let output = Command::new("lscpu")
+            .args(&["-p=cpu,node"])
+            .output()?;
+
+        let output_str = String::from_utf8(output.stdout)?;
+        for line in output_str.lines() {
+            if line.starts_with('#') { continue; }
+            let parts: Vec<&str> = line.split(',').collect();
+            if parts.len() >= 2 {
+                if let (Ok(cpu), Ok(node)) = (parts[0].parse::<u32>(), parts[1].parse::<i32>()) {
+                    if let Some(numa_node) = nodes.get_mut(&node.to_string()) {
+                        numa_node.cpus.push(cpu);
+                    }
+                }
+            }
+        }
+
+        // Sort CPUs within each node
+        for node in nodes.values_mut() {
+            node.cpus.sort();
+        }
+
+        Ok(nodes)
+    } 
+
+    /// Collects NUMA topology information
+    fn collect_numa_info() -> Result<NumaInfo, Box<dyn Error>> {
+        let mut nodes = Vec::new();
+
+        // Read NUMA node information using numactl
+        let output = Command::new("numactl")
+            .args(&["--hardware"])
+            .output()?;
+
+        let output_str = String::from_utf8(output.stdout)?;
+        let mut current_node: Option<NumaNode> = None;
+
+        for line in output_str.lines() {
+            if line.starts_with("node ") && line.contains("size:") {
+                // Parse node ID and memory size
+                let parts: Vec<&str> = line.split_whitespace().collect();
+                if parts.len() >= 4 {
+                    if let Ok(id) = parts[1].parse::<i32>() {
+                        let memory = format!("{} {}", parts[3], parts[4]);
+                        if let Some(node) = current_node {
+                            nodes.push(node);
+                        }
+                        current_node = Some(NumaNode {
+                            id,
+                            memory,
+                            cpus: Vec::new(),
+                            devices: Vec::new(),
+                            distances: HashMap::new(),
+                        });
+                    }
+                }
+            } else if line.contains("node distances:") {
+                if let Some(node) = current_node {
+                    nodes.push(node);
+                    break;
+                }
+            }
+        }
+
+        // Collect CPU information for each node
+        for node in &mut nodes {
+            let output = Command::new("lscpu")
+                .args(&["-p=cpu,node"])
+                .output()?;
+
+            let output_str = String::from_utf8(output.stdout)?;
+            for line in output_str.lines() {
+                if line.starts_with('#') {
+                    continue;
+                }
+                let parts: Vec<&str> = line.split(',').collect();
+                if parts.len() >= 2 {
+                    if let (Ok(cpu), Ok(numa_node)) = (parts[0].parse::<u32>(), parts[1].parse::<i32>()) {
+                        if numa_node == node.id {
+                            node.cpus.push(cpu);
+                        }
+                    }
+                }
+            }
+        }
+
+        Ok(NumaInfo { nodes })
+    }
+
+
     /// Collects all server information
     fn collect() -> Result<Self, Box<dyn Error>> {
+        // Check dependencies first
+        let missing_packages = Self::check_dependencies()?;
+
+        // If any essential packages are missing, return an error
+        if !missing_packages.is_empty() {
+            return Err("Missing required system packages. Please install them and try again.".into());
+        }
+
+        // Check if running as root
+        let euid = unsafe { libc::geteuid() };
+        if euid != 0 {
+            eprintln!("\nWarning: This program requires root privileges to access all hardware information.");
+            eprintln!("Please run it with: sudo {}", std::env::args().next().unwrap_or_default());
+            eprintln!("Continuing with limited functionality...\n");
+        }
+
         let hostname = Self::get_hostname()?;
         let hardware = Self::collect_hardware_info()?;
         let network = Self::collect_network_info()?;
@@ -400,12 +707,57 @@ impl ServerInfo {
         Err(format!("Could not find key: {}", key).into())
     }
 
+    /// Gets detailed CPU topology information
+    fn get_cpu_topology() -> Result<CpuTopology, Box<dyn Error>> {
+        let output = Command::new("lscpu")
+            .args(&["-J"])
+            .output()?;
+
+        let json: serde_json::Value = serde_json::from_slice(&output.stdout)?;
+        let mut info_map = HashMap::new();
+
+        if let Some(entries) = json["lscpu"].as_array() {
+            for entry in entries {
+                if let (Some(field), Some(data)) = (entry["field"].as_str(), entry["data"].as_str()) {
+                    let key = field.trim_end_matches(':');
+                    info_map.insert(key.to_string(), data.to_string());
+                }
+            }
+        }
+
+        Ok(CpuTopology {
+            total_cores: info_map.get("Core(s) per socket")
+                .and_then(|v| v.parse().ok())
+                .unwrap_or(0) * info_map.get("Socket(s)")
+                .and_then(|v| v.parse().ok())
+                .unwrap_or(0),
+            total_threads: info_map.get("CPU(s)")
+                .and_then(|v| v.parse().ok())
+                .unwrap_or(0),
+            sockets: info_map.get("Socket(s)")
+                .and_then(|v| v.parse().ok())
+                .unwrap_or(0),
+            cores_per_socket: info_map.get("Core(s) per socket")
+                .and_then(|v| v.parse().ok())
+                .unwrap_or(0),
+            threads_per_core: info_map.get("Thread(s) per core")
+                .and_then(|v| v.parse().ok())
+                .unwrap_or(0),
+            numa_nodes: info_map.get("NUMA node(s)")
+                .and_then(|v| v.parse().ok())
+                .unwrap_or(0),
+            cpu_model: info_map.get("Model name")
+                .cloned()
+                .unwrap_or_else(|| "Unknown".to_string()),
+        })
+    }
+
     /// Generates system summary with better error handling
+    /// Enhanced summary generation with NUMA topology
     fn generate_summary(
         hardware: &HardwareInfo,
         network: &NetworkInfo,
     ) -> Result<SystemSummary, Box<dyn Error>> {
-        // Get BIOS and chassis info, with graceful fallback
         let bios = Self::get_bios_info().unwrap_or_else(|_| BiosInfo {
             vendor: "Unknown Vendor".to_string(),
             version: "Unknown Version".to_string(),
@@ -428,9 +780,9 @@ impl ServerInfo {
             chassis,
             total_gpus: hardware.gpus.devices.len(),
             total_nics: network.interfaces.len(),
+            numa_topology: Self::collect_numa_topology()?,
         })
     }
-
     /// Collects IP addresses for all network interfaces.
     fn collect_ip_addresses() -> Result<HashMap<String, String>, Box<dyn Error>> {
         // Run 'ip -j addr show' to get JSON output of network interfaces.
@@ -622,51 +974,169 @@ impl ServerInfo {
     fn collect_gpu_info() -> Result<GpuInfo, Box<dyn Error>> {
         let output = Command::new("nvidia-smi")
             .args(&[
-                "--query-gpu=index,name,uuid,memory.total",
-                "--format=csv,noheader,nounits",
+                "--query-gpu=index,name,uuid,memory.total,pci.bus_id",
+                "--format=csv,noheader",
             ])
             .output();
 
-        match output {
-            Ok(output) => {
-                let output_str = String::from_utf8(output.stdout)?;
-                let mut devices = Vec::new();
+        let mut devices = Vec::new();
 
-                for line in output_str.lines() {
-                    let parts: Vec<&str> = line.split(',').collect();
-                    if parts.len() >= 4 {
-                        devices.push(GpuDevice {
-                            index: parts[0].trim().parse()?,
-                            name: parts[1].trim().to_string(),
-                            uuid: parts[2].trim().to_string(),
-                            memory: format!("{} MB", parts[3].trim()),
+        if let Ok(output) = output {
+            let output_str = String::from_utf8(output.stdout)?;
+
+            for line in output_str.lines() {
+                let parts: Vec<&str> = line.split(',').collect();
+                if parts.len() >= 5 {
+                    let pci_addr = parts[4].trim();
+                    let (vendor, _, pci_id) = Self::get_pci_info(pci_addr)
+                        .unwrap_or(("NVIDIA".to_string(), "Unknown".to_string(), "Unknown".to_string()));
+
+                    devices.push(GpuDevice {
+                        index: parts[0].trim().parse()?,
+                        name: parts[1].trim().to_string(),
+                        uuid: parts[2].trim().to_string(),
+                        memory: format!("{}", parts[3].trim()),
+                        pci_id,
+                        vendor,
+                        numa_node: Self::get_numa_node(pci_addr),
+                    });
+                }
+            }
+        }
+
+        Ok(GpuInfo { devices })
+    }
+
+    /// Collects NUMA topology information
+    fn get_numa_topology(
+        hardware: &HardwareInfo,
+        network: &NetworkInfo,
+    ) -> Result<HashMap<i32, NumaNode>, Box<dyn Error>> {
+        let mut nodes = HashMap::new();
+
+        // Get basic NUMA information using numactl
+        let output = Command::new("numactl")
+            .args(&["--hardware"])
+            .output()?;
+        let output_str = String::from_utf8(output.stdout)?;
+
+        // Parse node information
+        let mut current_node_id = None;
+        for line in output_str.lines() {
+            if line.starts_with("node ") && line.contains("size:") {
+                let parts: Vec<&str> = line.split_whitespace().collect();
+                if parts.len() >= 4 {
+                    if let Ok(id) = parts[1].parse::<i32>() {
+                        current_node_id = Some(id);
+                        let memory = format!("{} {}", parts[3], parts[4]);
+                        nodes.insert(id, NumaNode {
+                            id,
+                            memory,
+                            cpus: Vec::new(),
+                            devices: Vec::new(),
+                            distances: HashMap::new(),
                         });
                     }
                 }
-
-                Ok(GpuInfo { devices })
-            }
-            Err(_) => {
-                // nvidia-smi command not found or failed.
-                Ok(GpuInfo {
-                    devices: Vec::new(),
-                })
+            } else if line.contains("node distances:") {
+                break;
             }
         }
+
+        // Get CPU to node mapping
+        let output = Command::new("lscpu")
+            .args(&["-p=cpu,node"])
+            .output()?;
+        let output_str = String::from_utf8(output.stdout)?;
+
+        for line in output_str.lines() {
+            if line.starts_with('#') { continue; }
+            let parts: Vec<&str> = line.split(',').collect();
+            if parts.len() >= 2 {
+                if let (Ok(cpu), Ok(node)) = (parts[0].parse::<u32>(), parts[1].parse::<i32>()) {
+                    if let Some(numa_node) = nodes.get_mut(&node) {
+                        numa_node.cpus.push(cpu);
+                    }
+                }
+            }
+        }
+
+        // Get device to node mapping
+        // First, collect GPUs
+        for gpu in &hardware.gpus.devices {
+            if let Some(node) = gpu.numa_node {
+                if let Some(numa_node) = nodes.get_mut(&node) {
+                    numa_node.devices.push(NumaDevice {
+                        type_: "GPU".to_string(),
+                        name: gpu.name.clone(),
+                        pci_id: gpu.pci_id.clone(),
+                    });
+                }
+            }
+        }
+
+        // Then, collect NICs
+        for nic in &network.interfaces {
+            if let Some(node) = nic.numa_node {
+                if let Some(numa_node) = nodes.get_mut(&node) {
+                    numa_node.devices.push(NumaDevice {
+                        type_: "NIC".to_string(),
+                        name: nic.name.clone(),
+                        pci_id: nic.pci_id.clone(),
+                    });
+                }
+            }
+        }
+
+        // Get node distances
+        let output = Command::new("numactl")
+            .args(&["--hardware"])
+            .output()?;
+        let output_str = String::from_utf8(output.stdout)?;
+        let mut reading_distances = false;
+
+        for line in output_str.lines() {
+            if line.contains("node distances:") {
+                reading_distances = true;
+                continue;
+            }
+            if reading_distances && line.starts_with("node") {
+                let parts: Vec<&str> = line.split_whitespace().collect();
+                if parts.len() > 1 {
+                    if let Ok(from_node) = parts[1].parse::<i32>() {
+                        for (i, distance_str) in parts[2..].iter().enumerate() {
+                            if let Ok(distance) = distance_str.parse::<u32>() {
+                                if let Some(node) = nodes.get_mut(&from_node) {
+                                    node.distances.insert((i as i32).to_string(), distance.to_string().parse().unwrap());
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        Ok(nodes)
     }
 
     /// Collects network information, including Infiniband if available.
     fn collect_network_info() -> Result<NetworkInfo, Box<dyn Error>> {
         let mut interfaces = Vec::new();
         let output = Command::new("ip").args(&["-j", "addr", "show"]).output()?;
-
         let json: serde_json::Value = serde_json::from_slice(&output.stdout)?;
 
         if let Some(ifaces) = json.as_array() {
             for iface in ifaces {
                 if let Some(name) = iface["ifname"].as_str() {
+                    // Skip loopback
+                    if name == "lo" {
+                        continue;
+                    }
+
                     let mac = iface["address"].as_str().unwrap_or("").to_string();
                     let mut ip = String::new();
+
+                    // Get IP address
                     if let Some(addr_info) = iface["addr_info"].as_array() {
                         for addr in addr_info {
                             if addr["family"].as_str() == Some("inet") {
@@ -676,10 +1146,25 @@ impl ServerInfo {
                         }
                     }
 
-                    // Retrieve interface speed using 'ethtool'.
-                    let speed_output = Command::new("ethtool").arg(name).output();
+                    // Get PCI information and speed
+                    let mut vendor = String::new();
+                    let mut model = String::new();
+                    let mut pci_id = String::new();
+                    let mut numa_node = None;
 
-                    let speed = match speed_output {
+                    if let Ok(pci_addr) = std::fs::read_link(format!("/sys/class/net/{}/device", name)) {
+                        if let Some(addr_str) = pci_addr.file_name().and_then(|n| n.to_str()) {
+                            if let Ok((v, m, p)) = Self::get_pci_info(addr_str) {
+                                vendor = v;
+                                model = m;
+                                pci_id = p;
+                                numa_node = Self::get_numa_node(addr_str);
+                            }
+                        }
+                    }
+
+                    // Get speed using ethtool
+                    let speed = match Command::new("ethtool").arg(name).output() {
                         Ok(output) => {
                             let output_str = String::from_utf8(output.stdout)?;
                             let re_speed = Regex::new(r"Speed:\s+(\S+)")?;
@@ -692,27 +1177,27 @@ impl ServerInfo {
                         Err(_) => None,
                     };
 
-                    // Determine interface type.
-                    let type_ = iface["link_type"].as_str().unwrap_or("").to_string();
-
                     interfaces.push(NetworkInterface {
                         name: name.to_string(),
                         mac,
                         ip,
                         speed,
-                        type_,
+                        type_: iface["link_type"].as_str().unwrap_or("").to_string(),
+                        vendor,
+                        model,
+                        pci_id,
+                        numa_node,
                     });
                 }
             }
         }
 
-        let infiniband = Self::collect_infiniband_info()?;
-
         Ok(NetworkInfo {
             interfaces,
-            infiniband,
+            infiniband: Self::collect_infiniband_info()?,
         })
     }
+
 
     /// Collects Infiniband information by parsing 'ibstat' output.
     fn collect_infiniband_info() -> Result<Option<InfinibandInfo>, Box<dyn Error>> {
@@ -820,8 +1305,52 @@ fn main() -> Result<(), Box<dyn Error>> {
         ServerInfo::extract_dmidecode_value(&chassis_str, "Serial Number")?
     );
 
-    println!("GPUs: {}", server_info.hardware.gpus.devices.len());
-    println!("NICs: {}", server_info.network.interfaces.len());
+    println!("\nNetwork Interfaces:");
+    for nic in &server_info.network.interfaces {
+        println!("  {} - {} {} ({}) [Speed: {}] [NUMA: {}]",
+                 nic.name,
+                 nic.vendor,
+                 nic.model,
+                 nic.pci_id,
+                 nic.speed.as_deref().unwrap_or("Unknown"),
+                 nic.numa_node.map_or("Unknown".to_string(), |n| n.to_string())
+        );
+    }
+
+    println!("\nGPUs:");
+    for gpu in &server_info.hardware.gpus.devices {
+        println!("  {} - {} ({}) [NUMA: {}]",
+                 gpu.name,
+                 gpu.vendor,
+                 gpu.pci_id,
+                 gpu.numa_node.map_or("Unknown".to_string(), |n| n.to_string())
+        );
+    }
+
+    println!("\nNUMA Topology:");
+    for (node_id, node) in &server_info.summary.numa_topology {
+        println!("  Node {}:", node_id);
+        println!("    Memory: {}", node.memory);
+        println!("    CPUs: {:?}", node.cpus);
+
+        if !node.devices.is_empty() {
+            println!("    Devices:");
+            for device in &node.devices {
+                println!("      {} - {} (PCI ID: {})",
+                         device.type_,
+                         device.name,
+                         device.pci_id
+                );
+            }
+        }
+
+        println!("    Distances:");
+        let mut distances: Vec<_> = node.distances.iter().collect();
+        distances.sort_by_key(|&(k, _)| k);
+        for (to_node, distance) in distances {
+            println!("      To Node {}: {}", to_node, distance);
+        }
+    }    
 
     // Get filesystem information
     println!("\nFilesystems:");
