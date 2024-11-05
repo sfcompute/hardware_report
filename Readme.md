@@ -138,8 +138,6 @@ The program handles various error cases gracefully:
 - `serde` - For serialization
 - `toml` - For TOML format handling
 
-## License
-[Insert your chosen license here]
 
 ## Contributing
 Pull requests are welcome. For major changes, please open an issue first to discuss what you would like to change.
