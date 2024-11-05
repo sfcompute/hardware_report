@@ -2,9 +2,31 @@
 name = "hardware_report"
 version = "0.1.0"
 edition = "2021"
+authors = ["Kenny Sheridan"]
+description = "A tool for generating hardware information reports"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-regex.workspace = true
-serde.workspace = true
-serde_json.workspace = true
+sysinfo = "0.32.0" # For system information gathering
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0" # For JSON output
+clap = { version = "4.4", features = [
+    "derive",
+] } # For command line argument parsing
+thiserror = "1.0" # For error handling
+log = "0.4" # For logging
+env_logger = "0.11.5" # For logging implementation
+regex = "1.11.1"
 toml = "0.8.19"
+
+[dev-dependencies]
+tempfile = "3.8"   # For temporary file handling in tests
+assert_fs = "1.0"  # For filesystem assertions in tests
+predicates = "3.0" # For test assertions
+
+[profile.release]
+opt-level = 3     # Maximum optimization
+lto = true        # Enable link-time optimization
+codegen-units = 1 # Maximize performance
+strip = true      # Strip symbols from binary
