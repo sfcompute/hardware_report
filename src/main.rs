@@ -156,15 +156,46 @@ struct GpuInfo {
 /// Represents a GPU device.
 #[derive(Debug, Serialize, Deserialize)]
 struct GpuDevice {
-    /// GPU index.
+    /// GPU index
     index: u32,
-    /// GPU name.
+    /// GPU name
     name: String,
-    /// GPU UUID.
+    /// GPU UUID
     uuid: String,
-    /// Total GPU memory.
+    /// Total GPU memory
     memory: String,
+    /// PCI ID (vendor:device)
+    pci_id: String,
+    /// Vendor name
+    vendor: String,
+    /// NUMA node
+    numa_node: Option<i32>, 
 }
+
+/// Represents a NUMA node
+#[derive(Debug, Serialize, Deserialize)]
+struct NumaNode {
+    /// Node ID
+    id: i32,
+    /// CPU list
+    cpus: Vec<u32>,
+    /// Memory size
+    memory: String,
+    /// Devices attached to this node
+    devices: Vec<NumaDevice>,
+}
+
+/// Represents a device attached to a NUMA node
+#[derive(Debug, Serialize, Deserialize)]
+struct NumaDevice {
+    /// Device type (GPU, NIC, etc.)
+    type_: String,
+    /// PCI ID
+    pci_id: String,
+    /// Device name
+    name: String,
+}
+
 
 /// Represents network information.
 #[derive(Debug, Serialize, Deserialize)]
