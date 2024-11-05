@@ -20,20 +20,55 @@ use std::error::Error;
 use std::process::Command;
 use toml;
 
-/// Represents the overall server information.
+/// Summary of key system components
+#[derive(Debug, Serialize, Deserialize)]
+struct SystemSummary {
+    /// Total system memory capacity
+    total_memory: String,
+    /// Memory speed and type
+    memory_config: String,
+    /// Total storage capacity
+    total_storage: String,
+    /// Available filesystems
+    filesystems: Vec<String>,
+    /// BIOS information
+    bios: BiosInfo,
+    /// System chassis information
+    chassis: ChassisInfo,
+    /// Total number of GPUs
+    total_gpus: usize,
+    /// Total number of network interfaces
+    total_nics: usize,
+}
+
+/// BIOS information
+#[derive(Debug, Serialize, Deserialize)]
+struct BiosInfo {
+    vendor: String,
+    version: String,
+    release_date: String,
+    firmware_version: String,
+}
+
+/// Chassis information
+#[derive(Debug, Serialize, Deserialize)]
+struct ChassisInfo {
+    manufacturer: String,
+    type_: String,
+    serial: String,
+}
+
+/// Represents the overall server information
 #[derive(Debug, Serialize, Deserialize)]
 struct ServerInfo {
-    /// Hostname of the server.
+    /// System summary
+    summary: SystemSummary,
+    /// Other fields remain the same
     hostname: String,
-    /// Mapping from OS network interface names to their IP addresses.
-    os_ip: HashMap<String, String>, // Interface name -> IP
-    /// IP address of the BMC (if available).
+    os_ip: HashMap<String, String>,
     bmc_ip: Option<String>,
-    /// MAC address of the BMC (if available).
     bmc_mac: Option<String>,
-    /// Detailed hardware information.
     hardware: HardwareInfo,
-    /// Network interfaces and Infiniband information.
     network: NetworkInfo,
 }
 
@@ -176,16 +211,26 @@ struct IbInterface {
 }
 
 impl ServerInfo {
-    /// Collects all server information by calling various system commands.
+    /// Gets hostname of the server
+    fn get_hostname() -> Result<String, Box<dyn Error>> {
+        let output = Command::new("hostname").output()?;
+        Ok(String::from_utf8(output.stdout)?.trim().to_string())
+    }
+
+    /// Collects all server information
     fn collect() -> Result<Self, Box<dyn Error>> {
         let hostname = Self::get_hostname()?;
-        let network = Self::collect_network_info()?;
         let hardware = Self::collect_hardware_info()?;
+        let network = Self::collect_network_info()?;
         let (bmc_ip, bmc_mac) = Self::collect_ipmi_info()?;
+        let os_ip = Self::collect_ip_addresses()?;
+
+        let summary = Self::generate_summary(&hardware, &network)?;
 
         Ok(ServerInfo {
+            summary,
             hostname,
-            os_ip: Self::collect_ip_addresses()?,
+            os_ip,
             bmc_ip,
             bmc_mac,
             hardware,
@@ -193,10 +238,197 @@ impl ServerInfo {
         })
     }
 
-    /// Retrieves the hostname of the server.
-    fn get_hostname() -> Result<String, Box<dyn Error>> {
-        let output = Command::new("hostname").output()?;
-        Ok(String::from_utf8(output.stdout)?.trim().to_string())
+    /// Calculates total storage capacity
+    fn calculate_total_storage(storage: &StorageInfo) -> Result<String, Box<dyn Error>> {
+        let mut total_bytes: u64 = 0;
+
+        for device in &storage.devices {
+            let size_str = device.size.replace(" ", "");
+            let re = Regex::new(r"(\d+(?:\.\d+)?)(B|K|M|G|T)")?;
+
+            if let Some(caps) = re.captures(&size_str) {
+                let value: f64 = caps[1].parse()?;
+                let unit = &caps[2];
+
+                let multiplier = match unit {
+                    "B" => 1_u64,
+                    "K" => 1024_u64,
+                    "M" => 1024_u64 * 1024,
+                    "G" => 1024_u64 * 1024 * 1024,
+                    "T" => 1024_u64 * 1024 * 1024 * 1024,
+                    _ => 0_u64,
+                };
+
+                total_bytes += (value * multiplier as f64) as u64;
+            }
+        }
+
+        if total_bytes >= 1024 * 1024 * 1024 * 1024 {
+            Ok(format!(
+                "{:.1} TB",
+                total_bytes as f64 / (1024.0 * 1024.0 * 1024.0 * 1024.0)
+            ))
+        } else {
+            Ok(format!(
+                "{:.1} GB",
+                total_bytes as f64 / (1024.0 * 1024.0 * 1024.0)
+            ))
+        }
+    }
+
+    /// Gets filesystem information
+    fn get_filesystems() -> Result<Vec<String>, Box<dyn Error>> {
+        let output = Command::new("df")
+            .args(&["-h", "--output=source,fstype,size,used,avail,target"])
+            .output()?;
+
+        let output_str = String::from_utf8(output.stdout)?;
+        let mut filesystems = Vec::new();
+
+        for line in output_str.lines().skip(1) {
+            let fields: Vec<&str> = line.split_whitespace().collect();
+            if fields.len() >= 6 {
+                filesystems.push(format!(
+                    "{} ({}) - {} total, {} used, {} available, mounted on {}",
+                    fields[0], fields[1], fields[2], fields[3], fields[4], fields[5]
+                ));
+            }
+        }
+
+        Ok(filesystems)
+    }
+
+    /// Gets BIOS information using dmidecode with minimal output
+    fn get_bios_info() -> Result<BiosInfo, Box<dyn Error>> {
+        // Try without sudo first, then with sudo if needed
+        let output = match Command::new("dmidecode").args(&["-t", "0"]).output() {
+            Ok(out) => {
+                if !out.status.success() {
+                    Command::new("sudo")
+                        .args(&["dmidecode", "-t", "0"])
+                        .output()?
+                } else {
+                    out
+                }
+            }
+            Err(_) => Command::new("sudo")
+                .args(&["dmidecode", "-t", "0"])
+                .output()?,
+        };
+
+        let stdout = String::from_utf8_lossy(&output.stdout);
+
+        if !output.status.success() || stdout.trim().is_empty() {
+            return Ok(BiosInfo {
+                vendor: "Unknown Vendor".to_string(),
+                version: "Unknown Version".to_string(),
+                release_date: "Unknown Date".to_string(),
+                firmware_version: "N/A".to_string(),
+            });
+        }
+
+        Ok(BiosInfo {
+            vendor: Self::extract_dmidecode_value(&stdout, "Vendor")
+                .unwrap_or_else(|_| "Unknown Vendor".to_string()),
+            version: Self::extract_dmidecode_value(&stdout, "Version")
+                .unwrap_or_else(|_| "Unknown Version".to_string()),
+            release_date: Self::extract_dmidecode_value(&stdout, "Release Date")
+                .unwrap_or_else(|_| "Unknown Date".to_string()),
+            firmware_version: Self::extract_dmidecode_value(&stdout, "Firmware Revision")
+                .unwrap_or_else(|_| "N/A".to_string()),
+        })
+    }
+
+    /// Gets chassis information using dmidecode with minimal output
+    fn get_chassis_info() -> Result<ChassisInfo, Box<dyn Error>> {
+        let output = match Command::new("dmidecode").args(&["-t", "3"]).output() {
+            Ok(out) => {
+                if !out.status.success() {
+                    Command::new("sudo")
+                        .args(&["dmidecode", "-t", "3"])
+                        .output()?
+                } else {
+                    out
+                }
+            }
+            Err(_) => Command::new("sudo")
+                .args(&["dmidecode", "-t", "3"])
+                .output()?,
+        };
+
+        let stdout = String::from_utf8_lossy(&output.stdout);
+
+        if !output.status.success() || stdout.trim().is_empty() {
+            return Ok(ChassisInfo {
+                manufacturer: "Unknown Manufacturer".to_string(),
+                type_: "Unknown Type".to_string(),
+                serial: "Unknown S/N".to_string(),
+            });
+        }
+
+        Ok(ChassisInfo {
+            manufacturer: Self::extract_dmidecode_value(&stdout, "Manufacturer")
+                .unwrap_or_else(|_| "Unknown Manufacturer".to_string()),
+            type_: Self::extract_dmidecode_value(&stdout, "Type")
+                .unwrap_or_else(|_| "Unknown Type".to_string()),
+            serial: Self::extract_dmidecode_value(&stdout, "Serial Number")
+                .unwrap_or_else(|_| "Unknown S/N".to_string()),
+        })
+    }
+
+    /// Extracts a value from 'dmidecode' output without debug output
+    fn extract_dmidecode_value(text: &str, key: &str) -> Result<String, Box<dyn Error>> {
+        let patterns = [
+            format!(r"(?im)^\s*{}: (.*)$", regex::escape(key)),
+            format!(r"(?im)^\s*{}\s+(.*)$", regex::escape(key)),
+            format!(r"(?im)^{}: (.*)$", regex::escape(key)),
+        ];
+
+        for pattern in patterns.iter() {
+            if let Ok(re) = Regex::new(pattern) {
+                if let Some(cap) = re.captures(text) {
+                    if let Some(value) = cap.get(1) {
+                        let result = value.as_str().trim().to_string();
+                        if !result.is_empty() {
+                            return Ok(result);
+                        }
+                    }
+                }
+            }
+        }
+
+        Err(format!("Could not find key: {}", key).into())
+    }
+
+    /// Generates system summary with better error handling
+    fn generate_summary(
+        hardware: &HardwareInfo,
+        network: &NetworkInfo,
+    ) -> Result<SystemSummary, Box<dyn Error>> {
+        // Get BIOS and chassis info, with graceful fallback
+        let bios = Self::get_bios_info().unwrap_or_else(|_| BiosInfo {
+            vendor: "Unknown Vendor".to_string(),
+            version: "Unknown Version".to_string(),
+            release_date: "Unknown Date".to_string(),
+            firmware_version: "N/A".to_string(),
+        });
+
+        let chassis = Self::get_chassis_info().unwrap_or_else(|_| ChassisInfo {
+            manufacturer: "Unknown Manufacturer".to_string(),
+            type_: "Unknown Type".to_string(),
+            serial: "Unknown S/N".to_string(),
+        });
+
+        Ok(SystemSummary {
+            total_memory: hardware.memory.total.clone(),
+            memory_config: format!("{} @ {}", hardware.memory.type_, hardware.memory.speed),
+            total_storage: Self::calculate_total_storage(&hardware.storage)?,
+            filesystems: Self::get_filesystems().unwrap_or_default(),
+            bios,
+            chassis,
+            total_gpus: hardware.gpus.devices.len(),
+            total_nics: network.interfaces.len(),
+        })
     }
 
     /// Collects IP addresses for all network interfaces.
@@ -359,16 +591,6 @@ impl ServerInfo {
             speed,
             location,
         })
-    }
-
-    /// Extracts a value from 'dmidecode' output given a specific key.
-    fn extract_dmidecode_value(text: &str, key: &str) -> Result<String, Box<dyn Error>> {
-        let re = Regex::new(&format!(r"\t{}: (.*)", regex::escape(key)))?;
-        if let Some(cap) = re.captures(text) {
-            Ok(cap[1].trim().to_string())
-        } else {
-            Err(format!("Could not find key: {}", key).into())
-        }
     }
 
     /// Collects storage information by parsing 'lsblk' output.
@@ -550,13 +772,79 @@ impl ServerInfo {
 }
 
 fn main() -> Result<(), Box<dyn Error>> {
-    // Collect server information.
+    // Collect server information
     let server_info = ServerInfo::collect()?;
 
-    // Convert to TOML.
+    // Generate summary output for console
+    println!("System Summary:");
+    println!("==============");
+    println!(
+        "Memory: {} ({})",
+        server_info.hardware.memory.total,
+        format!(
+            "{} @ {}",
+            server_info.hardware.memory.type_, server_info.hardware.memory.speed
+        )
+    );
+
+    // Calculate total storage
+    let total_storage = server_info
+        .hardware
+        .storage
+        .devices
+        .iter()
+        .map(|device| device.size.clone())
+        .collect::<Vec<String>>()
+        .join(" + ");
+    println!("Storage: {}", total_storage);
+
+    // Get BIOS information from dmidecode
+    let output = Command::new("dmidecode").args(&["-t", "bios"]).output()?;
+    let bios_str = String::from_utf8(output.stdout)?;
+    println!(
+        "BIOS: {} {} ({})",
+        ServerInfo::extract_dmidecode_value(&bios_str, "Vendor")?,
+        ServerInfo::extract_dmidecode_value(&bios_str, "Version")?,
+        ServerInfo::extract_dmidecode_value(&bios_str, "Release Date")?
+    );
+
+    // Get chassis information from dmidecode
+    let output = Command::new("dmidecode")
+        .args(&["-t", "chassis"])
+        .output()?;
+    let chassis_str = String::from_utf8(output.stdout)?;
+    println!(
+        "Chassis: {} {} (S/N: {})",
+        ServerInfo::extract_dmidecode_value(&chassis_str, "Manufacturer")?,
+        ServerInfo::extract_dmidecode_value(&chassis_str, "Type")?,
+        ServerInfo::extract_dmidecode_value(&chassis_str, "Serial Number")?
+    );
+
+    println!("GPUs: {}", server_info.hardware.gpus.devices.len());
+    println!("NICs: {}", server_info.network.interfaces.len());
+
+    // Get filesystem information
+    println!("\nFilesystems:");
+    let output = Command::new("df")
+        .args(&["-h", "--output=source,fstype,size,used,avail,target"])
+        .output()?;
+    let fs_str = String::from_utf8(output.stdout)?;
+    for line in fs_str.lines().skip(1) {
+        let fields: Vec<&str> = line.split_whitespace().collect();
+        if fields.len() >= 6 {
+            println!(
+                "  {} ({}) - {} total, {} used, {} available, mounted on {}",
+                fields[0], fields[1], fields[2], fields[3], fields[4], fields[5]
+            );
+        }
+    }
+
+    println!("\nFull configuration being written to server_config.toml...");
+
+    // Convert to TOML
     let toml_string = toml::to_string_pretty(&server_info)?;
 
-    // Write to file.
+    // Write to file
     std::fs::write("server_config.toml", toml_string)?;
 
     println!("Configuration has been written to server_config.toml");
