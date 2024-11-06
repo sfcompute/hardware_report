@@ -97,7 +97,7 @@ git push origin v1.0.0
 You can download the latest release from the GitHub Releases page or use wget:
 ```bash
 # Get the latest release URL
-RELEASE_URL=$(curl -s https://api.github.com/repos/[owner]/hardware_report/releases/latest | grep "browser_download_url.*tar.gz\"" | cut -d '"' -f 4)
+RELEASE_URL=$(curl -s https://api.github.com/repos/sfcompute/hardware_report/releases/latest | grep "browser_download_url.*tar.gz\"" | cut -d '"' -f 4)
 
 # Download and verify the tarball
 wget $RELEASE_URL
