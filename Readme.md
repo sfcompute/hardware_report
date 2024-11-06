@@ -37,6 +37,7 @@ A Rust utility that automatically collects and reports detailed hardware informa
 - `numactl` (required for NUMA topology information)
 - `lscpu` (required for detailed CPU information)
 
+
 ## Building
 The project includes a Makefile that supports building for both Linux and macOS targets.
 
@@ -68,6 +69,44 @@ docker ps  # Should show Docker is running
 
 # Build for all supported platforms
 make all
+```
+
+## Continuous Integration and Releases
+
+### Automated Builds
+The project uses GitHub Actions for continuous integration and release management:
+- All pull requests are automatically tested
+- Code formatting and linting are checked
+- Releases are automatically built and published when version tags are pushed
+
+### Creating a Release
+1. Tag the commit you want to release:
+```bash
+git tag -a v1.0.0 -m "Release version 1.0.0"
+git push origin v1.0.0
+```
+
+2. The GitHub Actions workflow will automatically:
+   - Create a new GitHub Release
+   - Build the Linux binary
+   - Create a tarball with the binary
+   - Generate SHA256 checksums
+   - Upload the artifacts to the release
+
+### Downloading Releases
+You can download the latest release from the GitHub Releases page or use wget:
+```bash
+# Get the latest release URL
+RELEASE_URL=$(curl -s https://api.github.com/repos/[owner]/hardware_report/releases/latest | grep "browser_download_url.*tar.gz\"" | cut -d '"' -f 4)
+
+# Download and verify the tarball
+wget $RELEASE_URL
+wget $RELEASE_URL.sha256
+sha256sum -c hardware_report-linux-x86_64-*.tar.gz.sha256
+
+# Extract and make executable
+tar xzf hardware_report-linux-x86_64-*.tar.gz
+chmod +x hardware_report-linux-x86_64
 ```
 
 ## Usage
