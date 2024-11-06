@@ -52,6 +52,10 @@ struct SystemSummary {
     total_nics: usize,
     /// NUMA topology information
     numa_topology: HashMap<String, NumaNode>,
+    /// CPU topology information
+    cpu_topology: CpuTopology,
+    /// CPU configuration summary
+    cpu_summary: String,
 }
 
 /// BIOS information
@@ -508,6 +512,37 @@ impl ServerInfo {
         Ok(NumaInfo { nodes })
     }
 
+    fn collect_ip_addresses() -> Result<HashMap<String, String>, Box<dyn Error>> {
+        let output = Command::new("ip").args(&["-j", "addr", "show"]).output()?;
+        let json: serde_json::Value = serde_json::from_slice(&output.stdout)?;
+        let mut addresses = HashMap::new();
+
+        if let Some(interfaces) = json.as_array() {
+            for interface in interfaces {
+                if let (Some(name), Some(addr_info)) = (
+                    interface["ifname"].as_str(),
+                    interface["addr_info"].as_array(),
+                ) {
+                    // Skip loopback interface
+                    if name == "lo" {
+                        continue;
+                    }
+
+                    for addr in addr_info {
+                        if let Some(ip) = addr["local"].as_str() {
+                            if addr["family"].as_str() == Some("inet") {
+                                addresses.insert(name.to_string(), ip.to_string());
+                                break; // Take first IPv4 address only
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        Ok(addresses)
+    }
+
     /// Collects all server information
     fn collect() -> Result<Self, Box<dyn Error>> {
         // Check dependencies first
@@ -784,6 +819,30 @@ impl ServerInfo {
             serial: "Unknown S/N".to_string(),
         });
 
+        let cpu_topology = Self::get_cpu_topology()?;
+
+        // Create a detailed CPU summary string
+        let cpu_summary = format!(
+            "{} ({} Socket{}, {} Core{}/Socket, {} Thread{}/Core, {} NUMA Node{})",
+            cpu_topology.cpu_model,
+            cpu_topology.sockets,
+            if cpu_topology.sockets > 1 { "s" } else { "" },
+            cpu_topology.cores_per_socket,
+            if cpu_topology.cores_per_socket > 1 {
+                "s"
+            } else {
+                ""
+            },
+            cpu_topology.threads_per_core,
+            if cpu_topology.threads_per_core > 1 {
+                "s"
+            } else {
+                ""
+            },
+            cpu_topology.numa_nodes,
+            if cpu_topology.numa_nodes > 1 { "s" } else { "" }
+        );
+
         Ok(SystemSummary {
             total_memory: hardware.memory.total.clone(),
             memory_config: format!("{} @ {}", hardware.memory.type_, hardware.memory.speed),
@@ -794,35 +853,9 @@ impl ServerInfo {
             total_gpus: hardware.gpus.devices.len(),
             total_nics: network.interfaces.len(),
             numa_topology: Self::collect_numa_topology()?,
+            cpu_topology,
+            cpu_summary,
         })
-    }
-    /// Collects IP addresses for all network interfaces.
-    fn collect_ip_addresses() -> Result<HashMap<String, String>, Box<dyn Error>> {
-        // Run 'ip -j addr show' to get JSON output of network interfaces.
-        let output = Command::new("ip").args(&["-j", "addr", "show"]).output()?;
-
-        let json: serde_json::Value = serde_json::from_slice(&output.stdout)?;
-        let mut addresses = HashMap::new();
-
-        if let Some(interfaces) = json.as_array() {
-            for interface in interfaces {
-                if let (Some(name), Some(addr_info)) = (
-                    interface["ifname"].as_str(),
-                    interface["addr_info"].as_array(),
-                ) {
-                    for addr in addr_info {
-                        if let Some(ip) = addr["local"].as_str() {
-                            if addr["family"].as_str() == Some("inet") {
-                                // Map interface name to IPv4 address.
-                                addresses.insert(name.to_string(), ip.to_string());
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        Ok(addresses)
     }
 
     /// Collects detailed hardware information.
@@ -1282,6 +1315,15 @@ fn main() -> Result<(), Box<dyn Error>> {
     // Generate summary output for console
     println!("System Summary:");
     println!("==============");
+
+    // Add CPU summary to console output
+    println!("CPU: {}", server_info.summary.cpu_summary);
+    println!(
+        "Total: {} Cores, {} Threads",
+        server_info.summary.cpu_topology.total_cores,
+        server_info.summary.cpu_topology.total_threads
+    );
+
     println!(
         "Memory: {} ({})",
         server_info.hardware.memory.total,
