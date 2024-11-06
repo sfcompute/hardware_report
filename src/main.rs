@@ -570,7 +570,7 @@ impl ServerInfo {
     /// Gets filesystem information
     fn get_filesystems() -> Result<Vec<String>, Box<dyn Error>> {
         let output = Command::new("df")
-            .args(&["-h", "--output=source,fstype,size,used,avail,target"])
+            .args(["-h", "--output=source,fstype,size,used,avail,target"])
             .output()?;
 
         let output_str = String::from_utf8(output.stdout)?;
