@@ -1245,7 +1245,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     // Get filesystem information
     println!("\nFilesystems:");
     let output = Command::new("df")
-        .args(&["-h", "--output=source,fstype,size,used,avail,target"])
+        .args(["-h", "--output=source,fstype,size,used,avail,target"])
         .output()?;
     let fs_str = String::from_utf8(output.stdout)?;
     for line in fs_str.lines().skip(1) {
