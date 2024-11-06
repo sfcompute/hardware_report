@@ -8,6 +8,13 @@ on:
   # Allow manual trigger
   workflow_dispatch:
 
+# Add permissions block
+permissions:
+  contents: write
+  packages: write
+  issues: write
+  pull-requests: write
+
 env:
   CARGO_TERM_COLOR: always
   RUST_BACKTRACE: 1
