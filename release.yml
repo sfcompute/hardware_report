@@ -1,0 +1,95 @@
+name: Release Build
+
+on:
+  push:
+    # Trigger on version tags
+    tags:
+      - 'v*.*.*'
+  # Allow manual trigger
+  workflow_dispatch:
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+
+jobs:
+  create-release:
+    runs-on: ubuntu-latest
+    outputs:
+      upload_url: ${{ steps.create_release.outputs.upload_url }}
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - name: Get version from tag
+        id: version
+        run: echo "version=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+        
+      - name: Create Release
+        id: create_release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ github.ref }}
+          release_name: Release ${{ github.ref_name }}
+          draft: false
+          prerelease: false
+
+  build-linux:
+    needs: create-release
+    runs-on: ubuntu-latest
+    container:
+      image: ubuntu:latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Install build dependencies
+        run: |
+          apt-get update
+          apt-get install -y \
+            build-essential \
+            curl \
+            numactl \
+            pciutils \
+            ethtool \
+            dmidecode \
+            ipmitool
+
+      - name: Install Rust toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          target: x86_64-unknown-linux-gnu
+          override: true
+
+      - name: Build Release Binary
+        run: |
+          cargo build --release --target x86_64-unknown-linux-gnu
+          mkdir -p build/release
+          cp target/x86_64-unknown-linux-gnu/release/hardware_report build/release/hardware_report-linux-x86_64
+          strip build/release/hardware_report-linux-x86_64
+          
+      - name: Create tarball
+        run: |
+          cd build/release
+          tar czf hardware_report-linux-x86_64-${{ needs.create-release.outputs.version }}.tar.gz hardware_report-linux-x86_64
+          sha256sum hardware_report-linux-x86_64-${{ needs.create-release.outputs.version }}.tar.gz > hardware_report-linux-x86_64-${{ needs.create-release.outputs.version }}.tar.gz.sha256
+
+      - name: Upload Release Asset
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ needs.create-release.outputs.upload_url }}
+          asset_path: build/release/hardware_report-linux-x86_64-${{ needs.create-release.outputs.version }}.tar.gz
+          asset_name: hardware_report-linux-x86_64-${{ needs.create-release.outputs.version }}.tar.gz
+          asset_content_type: application/gzip
+
+      - name: Upload SHA256 checksum
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ needs.create-release.outputs.upload_url }}
+          asset_path: build/release/hardware_report-linux-x86_64-${{ needs.create-release.outputs.version }}.tar.gz.sha256
+          asset_name: hardware_report-linux-x86_64-${{ needs.create-release.outputs.version }}.tar.gz.sha256
+          asset_content_type: text/plain
