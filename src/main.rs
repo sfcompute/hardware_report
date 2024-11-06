@@ -17,7 +17,6 @@ use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 use std::error::Error;
 use std::process::Command;
-use toml;
 
 /// CPU topology information
 #[derive(Debug, Serialize, Deserialize)]
@@ -263,10 +262,17 @@ struct IbInterface {
     rate: String,
 }
 
+#[allow(dead_code)]
 struct NumaInfo {
     nodes: Vec<NumaNode>,
 }
 
+#[allow(unused_variables)]
+#[allow(unused_assignments)]
+#[allow(clippy::useless_format)]
+#[allow(clippy::manual_map)]
+#[allow(clippy::format_in_format_args)]
+#[allow(clippy::needless_borrows_for_generic_args)]
 impl ServerInfo {
     /// Checks for required system dependencies and returns any missing ones
     fn check_dependencies() -> Result<Vec<&'static str>, Box<dyn Error>> {
