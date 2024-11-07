@@ -1191,6 +1191,11 @@ fn main() -> Result<(), Box<dyn Error>> {
         server_info.hardware.memory.speed
     );
 
+    println!(
+        "Storage: {} (Total: {:.2} TB)",
+        server_info.summary.total_storage, server_info.summary.total_storage_tb
+    );
+
     // Calculate total storage
     let total_storage = server_info
         .hardware
