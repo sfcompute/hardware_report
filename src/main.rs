@@ -308,6 +308,31 @@ impl ServerInfo {
 
         Ok(missing_packages)
     }
+
+    /// Converts storage size string to bytes
+    fn parse_storage_size(size: &str) -> Result<u64, Box<dyn Error>> {
+        let size_str = size.replace(" ", "");
+        let re = Regex::new(r"(\d+(?:\.\d+)?)(B|K|M|G|T)")?;
+
+        if let Some(caps) = re.captures(&size_str) {
+            let value: f64 = caps[1].parse()?;
+            let unit = &caps[2];
+
+            let multiplier = match unit {
+                "B" => 1_u64,
+                "K" => 1024_u64,
+                "M" => 1024_u64 * 1024,
+                "G" => 1024_u64 * 1024 * 1024,
+                "T" => 1024_u64 * 1024 * 1024 * 1024,
+                _ => 0_u64,
+            };
+
+            Ok((value * multiplier as f64) as u64)
+        } else {
+            Err("Invalid storage size format".into())
+        }
+    }
+
     /// Gets hostname of the server
     fn get_hostname() -> Result<String, Box<dyn Error>> {
         let output = Command::new("hostname").output()?;
