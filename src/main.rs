@@ -814,9 +814,12 @@ impl ServerInfo {
             if cpu_topology.numa_nodes > 1 { "s" } else { "" }
         );
 
+        let total_storage_tb = Self::calculate_total_storage_tb(&hardware.storage)?;
+
         Ok(SystemSummary {
             total_memory: hardware.memory.total.clone(),
             memory_config: format!("{} @ {}", hardware.memory.type_, hardware.memory.speed),
+            total_storage_tb,
             total_storage: Self::calculate_total_storage(&hardware.storage)?,
             filesystems: Self::get_filesystems().unwrap_or_default(),
             bios,
