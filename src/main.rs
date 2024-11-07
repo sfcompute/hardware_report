@@ -39,6 +39,8 @@ struct SystemSummary {
     memory_config: String,
     /// Total storage capacity
     total_storage: String,
+    /// Total storage capacity in TB
+    total_storage_tb: f64,
     /// Available filesystems
     filesystems: Vec<String>,
     /// BIOS information
