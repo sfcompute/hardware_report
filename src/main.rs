@@ -30,6 +30,18 @@ struct CpuTopology {
     cpu_model: String,
 }
 
+/// Motherboard information
+#[derive(Debug, Serialize, Deserialize)]
+struct MotherboardInfo {
+    manufacturer: String,
+    product_name: String,
+    version: String,
+    serial: String,
+    features: String,
+    location: String,
+    type_: String,
+}
+
 /// Summary of key system components
 #[derive(Debug, Serialize, Deserialize)]
 struct SystemSummary {
@@ -47,6 +59,8 @@ struct SystemSummary {
     bios: BiosInfo,
     /// System chassis information
     chassis: ChassisInfo,
+    /// Motherboard information
+    motherboard: MotherboardInfo,
     /// Total number of GPUs
     total_gpus: usize,
     /// Total number of network interfaces
@@ -90,7 +104,7 @@ struct ServerInfo {
     network: NetworkInfo,
 }
 
-/// Contains detailed hardware information.
+/// Contains detailed hardware information
 #[derive(Debug, Serialize, Deserialize)]
 struct HardwareInfo {
     /// CPU information.
@@ -307,6 +321,55 @@ impl ServerInfo {
         }
 
         Ok(missing_packages)
+    }
+
+    /// Gets motherboard information using dmidecode
+    fn get_motherboard_info() -> Result<MotherboardInfo, Box<dyn Error>> {
+        let output = match Command::new("dmidecode").args(&["-t", "2"]).output() {
+            Ok(out) => {
+                if !out.status.success() {
+                    Command::new("sudo")
+                        .args(&["dmidecode", "-t", "2"])
+                        .output()?
+                } else {
+                    out
+                }
+            }
+            Err(_) => Command::new("sudo")
+                .args(&["dmidecode", "-t", "2"])
+                .output()?,
+        };
+
+        let stdout = String::from_utf8_lossy(&output.stdout);
+
+        if !output.status.success() || stdout.trim().is_empty() {
+            return Ok(MotherboardInfo {
+                manufacturer: "Unknown Manufacturer".to_string(),
+                product_name: "Unknown Product".to_string(),
+                version: "Unknown Version".to_string(),
+                serial: "Unknown S/N".to_string(),
+                features: "Unknown".to_string(),
+                location: "Unknown".to_string(),
+                type_: "Unknown".to_string(),
+            });
+        }
+
+        Ok(MotherboardInfo {
+            manufacturer: Self::extract_dmidecode_value(&stdout, "Manufacturer")
+                .unwrap_or_else(|_| "Unknown Manufacturer".to_string()),
+            product_name: Self::extract_dmidecode_value(&stdout, "Product Name")
+                .unwrap_or_else(|_| "Unknown Product".to_string()),
+            version: Self::extract_dmidecode_value(&stdout, "Version")
+                .unwrap_or_else(|_| "Unknown Version".to_string()),
+            serial: Self::extract_dmidecode_value(&stdout, "Serial Number")
+                .unwrap_or_else(|_| "Unknown S/N".to_string()),
+            features: Self::extract_dmidecode_value(&stdout, "Features")
+                .unwrap_or_else(|_| "Unknown".to_string()),
+            location: Self::extract_dmidecode_value(&stdout, "Location In Chassis")
+                .unwrap_or_else(|_| "Unknown".to_string()),
+            type_: Self::extract_dmidecode_value(&stdout, "Type")
+                .unwrap_or_else(|_| "Unknown".to_string()),
+        })
     }
 
     /// Converts storage size string to bytes
@@ -529,7 +592,9 @@ impl ServerInfo {
         // Check if running as root
         let euid = unsafe { libc::geteuid() };
         if euid != 0 {
-            eprintln!("\nWarning: This program requires root privileges to access all hardware information.");
+            eprintln!(
+            "\nWarning: This program requires root privileges to access all hardware information."
+        );
             eprintln!(
                 "Please run it with: sudo {}",
                 std::env::args().next().unwrap_or_default()
@@ -554,6 +619,17 @@ impl ServerInfo {
             hardware,
             network,
         })
+    }
+
+    /// Calculates total storage in terabytes
+    fn calculate_total_storage_tb(storage: &StorageInfo) -> Result<f64, Box<dyn Error>> {
+        let mut total_bytes: u64 = 0;
+
+        for device in &storage.devices {
+            total_bytes += Self::parse_storage_size(&device.size)?;
+        }
+
+        Ok(total_bytes as f64 / (1024.0 * 1024.0 * 1024.0 * 1024.0))
     }
 
     /// Calculates total storage capacity
@@ -789,6 +865,15 @@ impl ServerInfo {
             type_: "Unknown Type".to_string(),
             serial: "Unknown S/N".to_string(),
         });
+        let motherboard = Self::get_motherboard_info().unwrap_or_else(|_| MotherboardInfo {
+            manufacturer: "Unknown Manufacturer".to_string(),
+            product_name: "Unknown Product".to_string(),
+            version: "Unknown Version".to_string(),
+            serial: "Unknown S/N".to_string(),
+            features: "Unknown".to_string(),
+            location: "Unknown".to_string(),
+            type_: "Unknown".to_string(),
+        });
 
         let cpu_topology = Self::get_cpu_topology()?;
 
@@ -824,6 +909,7 @@ impl ServerInfo {
             filesystems: Self::get_filesystems().unwrap_or_default(),
             bios,
             chassis,
+            motherboard,
             total_gpus: hardware.gpus.devices.len(),
             total_nics: network.interfaces.len(),
             numa_topology: Self::collect_numa_topology()?,
@@ -1225,6 +1311,15 @@ fn main() -> Result<(), Box<dyn Error>> {
         ServerInfo::extract_dmidecode_value(&chassis_str, "Manufacturer")?,
         ServerInfo::extract_dmidecode_value(&chassis_str, "Type")?,
         ServerInfo::extract_dmidecode_value(&chassis_str, "Serial Number")?
+    );
+
+    // Get motherboard information from server_info
+    println!(
+        "Motherboard: {} {} v{} (S/N: {})",
+        server_info.summary.motherboard.manufacturer,
+        server_info.summary.motherboard.product_name,
+        server_info.summary.motherboard.version,
+        server_info.summary.motherboard.serial
     );
 
     println!("\nNetwork Interfaces:");
