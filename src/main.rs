@@ -1294,7 +1294,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         .map(|device| device.size.clone())
         .collect::<Vec<String>>()
         .join(" + ");
-    println!("Storage Disks: {}", total_storage);
+    println!("Available Disks: {}", total_storage);
 
     // Get BIOS information from dmidecode
     let output = Command::new("dmidecode").args(["-t", "bios"]).output()?;
