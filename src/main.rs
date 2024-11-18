@@ -1393,9 +1393,9 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     // Get chassis serial number ans sanitize it for use as the file_name
     let chassis_serial = server_info.summary.chassis.serial.clone();
-    let safe_filename = sanitze_filename(&chassis_serial);
+    let safe_filename = sanitize_filename(&chassis_serial);
 
-    fn sanitze_filename(filename: &str) -> String {
+    fn sanitize_filename(filename: &str) -> String {
         filename
             .chars()
             .map(|c| {
@@ -1409,11 +1409,11 @@ fn main() -> Result<(), Box<dyn Error>> {
     }
 
     println!(
-        "\nFull configuration being written to {}.toml...",
+        "\nCreating TOML output for system serial number: {}",
         safe_filename
     );
 
-    let output_filename = format!("{}.toml", safe_filename);
+    let output_filename = format!("{}_hardware_report.toml", safe_filename);
 
     // Convert to TOML
     let toml_string = toml::to_string_pretty(&server_info)?;
