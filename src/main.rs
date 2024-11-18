@@ -1262,6 +1262,9 @@ fn main() -> Result<(), Box<dyn Error>> {
     println!("System Summary:");
     println!("==============");
 
+    // Print the system Hostname
+    println!("Hostname: {}", server_info.hostname);
+
     println!("CPU: {}", server_info.summary.cpu_summary);
     println!(
         "Total: {} Cores, {} Threads",
@@ -1291,7 +1294,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         .map(|device| device.size.clone())
         .collect::<Vec<String>>()
         .join(" + ");
-    println!("Storage: {}", total_storage);
+    println!("Available Disks: {}", total_storage);
 
     // Get BIOS information from dmidecode
     let output = Command::new("dmidecode").args(["-t", "bios"]).output()?;
@@ -1388,15 +1391,37 @@ fn main() -> Result<(), Box<dyn Error>> {
         }
     }
 
-    println!("\nFull configuration being written to server_config.toml...");
+    // Get chassis serial number ans sanitize it for use as the file_name
+    let chassis_serial = server_info.summary.chassis.serial.clone();
+    let safe_filename = sanitize_filename(&chassis_serial);
+
+    fn sanitize_filename(filename: &str) -> String {
+        filename
+            .chars()
+            .map(|c| {
+                if c.is_alphanumeric() || c == '-' {
+                    c
+                } else {
+                    '_'
+                }
+            })
+            .collect::<String>()
+    }
+
+    println!(
+        "\nCreating TOML output for system serial number: {}",
+        safe_filename
+    );
+
+    let output_filename = format!("{}_hardware_report.toml", safe_filename);
 
     // Convert to TOML
     let toml_string = toml::to_string_pretty(&server_info)?;
 
     // Write to file
-    std::fs::write("server_config.toml", toml_string)?;
+    std::fs::write(&output_filename, toml_string)?;
 
-    println!("Configuration has been written to server_config.toml");
+    println!("Configuration has been written to {}", output_filename);
 
     Ok(())
 }
