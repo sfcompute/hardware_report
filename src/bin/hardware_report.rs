@@ -3,7 +3,7 @@ use std::fs;
 use std::io;
 use std::process::Command;
 
-use hardware_report::{HardwareReport, ServerInfo};
+use hardware_report::ServerInfo;
 
 fn main() -> Result<(), Box<dyn Error>> {
     // Collect server information
