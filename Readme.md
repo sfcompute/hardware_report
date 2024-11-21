@@ -1,6 +1,42 @@
 # Hardware Report
 A Rust utility that automatically collects and reports detailed hardware information from Linux servers, outputting the data in TOML format.
 
+The collected data is saved as `<chassis_serialnumber>_hardware_report.toml`, which ensures scalability by creating distinct reports for each server. These reports are useful for infrastructure standardization across heterogeneous bare-metal hardware, allowing operators to automate and manage configurations consistently.
+
+This tool is designed to help the open-source GPU infrastructure community by providing a uniform method for gathering and serializing system data, which can be particularly beneficial when managing diverse clusters of GPUs and servers with varying configurations.
+
+## Quick Start
+
+### Use as a Binary
+To compile the binary for `hardware_report`:
+
+```bash
+# Build for your platform
+cargo build --release
+
+# The binary will be available at:
+target/release/hardware_report
+```
+
+### Use as a Library
+You can use `hardware_report` as a library in your Rust project. Add the following to your `Cargo.toml`:
+
+```toml
+[dependencies]
+hardware_report = { path = "../path/to/hardware_report" }
+```
+
+Then, in your Rust code:
+
+```rust
+use hardware_report::HardwareReport;
+
+fn main() {
+    let report = HardwareReport::new().expect("Failed to create hardware report");
+    report.print_summary();
+}
+```
+
 ## ⚠️ IMPORTANT BUILD REQUIREMENT ⚠️
 **DOCKER MUST BE RUNNING ON YOUR LOCAL MACHINE TO COMPILE FOR LINUX ON NON-LINUX SYSTEMS**
 **WITHOUT DOCKER RUNNING, THE BUILD WILL FAIL WHEN EXECUTING `make linux` ON macOS OR WINDOWS**
@@ -30,7 +66,7 @@ A Rust utility that automatically collects and reports detailed hardware informa
 - Make
 - **Docker (REQUIRED for cross-compilation on non-Linux systems)**
 
-### Optional System Utilities
+### Required System Utilities
 - `nvidia-smi` (required for NVIDIA GPU information)
 - `ipmitool` (required for BMC information)
 - `ethtool` (required for network interface details)
