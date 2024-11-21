@@ -872,7 +872,7 @@ The program handles various error cases gracefully:
 Pull requests are welcome. For major changes, please open an issue first to discuss what you would like to change.
 
 ## Authors
-- SF Compute
+- Kenny Sheridan, Supercomputing Engineer
 
 ## Acknowledgments
 - This tool makes use of various Linux system utilities and their output formats
