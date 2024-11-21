@@ -31,3 +31,12 @@ opt-level = 3     # Maximum optimization
 lto = true        # Enable link-time optimization
 codegen-units = 1 # Maximize performance
 strip = true      # Strip symbols from binary
+
+# Hybrid configuration for library and binary
+[lib]
+name = "hardware_report" # Optional, defaults to the package name
+path = "src/lib.rs"      # Path to the library file
+
+[[bin]]
+name = "hardware_report_binary" # Name of the binary
+path = "src/bin/hardware_report.rs"         # Path to the binary's main.rs
