@@ -38,5 +38,5 @@ name = "hardware_report" # Optional, defaults to the package name
 path = "src/lib.rs"      # Path to the library file
 
 [[bin]]
-name = "hardware_report_cli" # Name of the binary
-path = "src/main.rs"         # Path to the binary's main.rs
+name = "hardware_report_binary" # Name of the binary
+path = "src/bin/hardware_report.rs"         # Path to the binary's main.rs
