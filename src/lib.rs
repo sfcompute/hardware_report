@@ -20,267 +20,267 @@ use std::process::Command;
 
 /// CPU topology information
 #[derive(Debug, Serialize, Deserialize)]
-struct CpuTopology {
-    total_cores: u32,
-    total_threads: u32,
-    sockets: u32,
-    cores_per_socket: u32,
-    threads_per_core: u32,
-    numa_nodes: u32,
-    cpu_model: String,
+pub struct CpuTopology {
+    pub total_cores: u32,
+    pub total_threads: u32,
+    pub sockets: u32,
+    pub cores_per_socket: u32,
+    pub threads_per_core: u32,
+    pub numa_nodes: u32,
+    pub cpu_model: String,
 }
 
 /// Motherboard information
 #[derive(Debug, Serialize, Deserialize)]
-struct MotherboardInfo {
-    manufacturer: String,
-    product_name: String,
-    version: String,
-    serial: String,
-    features: String,
-    location: String,
-    type_: String,
+pub struct MotherboardInfo {
+   pub manufacturer: String,
+   pub product_name: String,
+   pub version: String,
+   pub serial: String,
+   pub features: String,
+   pub location: String,
+   pub type_: String,
 }
 
 /// Summary of key system components
 #[derive(Debug, Serialize, Deserialize)]
-struct SystemSummary {
+pub struct SystemSummary {
     /// Total system memory capacity
-    total_memory: String,
+   pub total_memory: String,
     /// Memory speed and type
-    memory_config: String,
+   pub memory_config: String,
     /// Total storage capacity
-    total_storage: String,
+   pub total_storage: String,
     /// Total storage capacity in TB
-    total_storage_tb: f64,
+   pub total_storage_tb: f64,
     /// Available filesystems
-    filesystems: Vec<String>,
+   pub filesystems: Vec<String>,
     /// BIOS information
-    bios: BiosInfo,
+   pub bios: BiosInfo,
     /// System chassis information
-    chassis: ChassisInfo,
+   pub chassis: ChassisInfo,
     /// Motherboard information
-    motherboard: MotherboardInfo,
+   pub motherboard: MotherboardInfo,
     /// Total number of GPUs
-    total_gpus: usize,
+   pub total_gpus: usize,
     /// Total number of network interfaces
-    total_nics: usize,
+   pub total_nics: usize,
     /// NUMA topology information
-    numa_topology: HashMap<String, NumaNode>,
+   pub numa_topology: HashMap<String, NumaNode>,
     /// CPU topology information
-    cpu_topology: CpuTopology,
+   pub cpu_topology: CpuTopology,
     /// CPU configuration summary
-    cpu_summary: String,
+   pub cpu_summary: String,
 }
 
 /// BIOS information
 #[derive(Debug, Serialize, Deserialize)]
-struct BiosInfo {
-    vendor: String,
-    version: String,
-    release_date: String,
-    firmware_version: String,
+pub struct BiosInfo {
+   pub vendor: String,
+   pub version: String,
+   pub release_date: String,
+   pub firmware_version: String,
 }
 
 /// Chassis information
 #[derive(Debug, Serialize, Deserialize)]
-struct ChassisInfo {
-    manufacturer: String,
-    type_: String,
-    serial: String,
+pub struct ChassisInfo {
+   pub manufacturer: String,
+   pub type_: String,
+   pub serial: String,
 }
 
 /// Represents the overall server information
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ServerInfo {
     /// System summary
-    summary: SystemSummary,
+    pub summary: SystemSummary,
     /// Other fields remain the same
-    hostname: String,
-    os_ip: HashMap<String, String>,
-    bmc_ip: Option<String>,
-    bmc_mac: Option<String>,
-    hardware: HardwareInfo,
-    network: NetworkInfo,
+    pub hostname: String,
+    pub os_ip: HashMap<String, String>,
+    pub bmc_ip: Option<String>,
+    pub bmc_mac: Option<String>,
+    pub hardware: HardwareInfo,
+    pub network: NetworkInfo,
 }
 
 /// Contains detailed hardware information
 #[derive(Debug, Serialize, Deserialize)]
-struct HardwareInfo {
+pub struct HardwareInfo {
     /// CPU information.
-    cpu: CpuInfo,
+   pub cpu: CpuInfo,
     /// Memory information.
-    memory: MemoryInfo,
+   pub memory: MemoryInfo,
     /// Storage information.
-    storage: StorageInfo,
+   pub storage: StorageInfo,
     /// GPU information.
-    gpus: GpuInfo,
+   pub gpus: GpuInfo,
 }
 
 /// Represents CPU information.
 #[derive(Debug, Serialize, Deserialize)]
-struct CpuInfo {
+pub struct CpuInfo {
     /// CPU model name.
-    model: String,
+   pub model: String,
     /// Number of cores per socket.
-    cores: u32,
+   pub cores: u32,
     /// Number of threads per core.
-    threads: u32,
+   pub threads: u32,
     /// Number of sockets.
-    sockets: u32,
+   pub sockets: u32,
     /// CPU speed in MHz.
-    speed: String,
+   pub speed: String,
 }
 
 /// Represents memory information.
 #[derive(Debug, Serialize, Deserialize)]
-struct MemoryInfo {
+pub struct MemoryInfo {
     /// Total memory size.
-    total: String,
+    pub total: String,
     /// Memory type (e.g., DDR4).
-    type_: String,
+    pub type_: String,
     /// Memory speed.
-    speed: String,
+    pub speed: String,
     /// Individual memory modules.
-    modules: Vec<MemoryModule>,
+    pub modules: Vec<MemoryModule>,
 }
 
 /// Represents a memory module.
 #[derive(Debug, Serialize, Deserialize)]
-struct MemoryModule {
+pub struct MemoryModule {
     /// Size of the memory module.
-    size: String,
+    pub size: String,
     /// Type of the memory module.
-    type_: String,
+    pub type_: String,
     /// Speed of the memory module.
-    speed: String,
+    pub speed: String,
     /// Physical location of the memory module.
-    location: String,
+    pub location: String,
 }
 
 /// Represents storage information.
 #[derive(Debug, Serialize, Deserialize)]
-struct StorageInfo {
+pub struct StorageInfo {
     /// List of storage devices.
-    devices: Vec<StorageDevice>,
+    pub devices: Vec<StorageDevice>,
 }
 
 /// Represents a storage device.
 #[derive(Debug, Serialize, Deserialize)]
-struct StorageDevice {
+pub struct StorageDevice {
     /// Device name.
-    name: String,
+    pub name: String,
     /// Device type (e.g., disk).
-    type_: String,
+    pub type_: String,
     /// Device size.
-    size: String,
+    pub size: String,
     /// Device model.
-    model: String,
+    pub model: String,
 }
 
 /// Represents GPU information.
 #[derive(Debug, Serialize, Deserialize)]
-struct GpuInfo {
+pub struct GpuInfo {
     /// List of GPU devices.
-    devices: Vec<GpuDevice>,
+    pub devices: Vec<GpuDevice>,
 }
 
 /// Represents a GPU device.
 #[derive(Debug, Serialize, Deserialize)]
-struct GpuDevice {
+pub struct GpuDevice {
     /// GPU index
-    index: u32,
+    pub index: u32,
     /// GPU name
-    name: String,
+    pub name: String,
     /// GPU UUID
-    uuid: String,
+    pub uuid: String,
     /// Total GPU memory
-    memory: String,
+    pub memory: String,
     /// PCI ID (vendor:device)
-    pci_id: String,
+    pub pci_id: String,
     /// Vendor name
-    vendor: String,
+    pub vendor: String,
     /// NUMA node
-    numa_node: Option<i32>,
+    pub numa_node: Option<i32>,
 }
 
 /// Represents a NUMA node
 #[derive(Debug, Serialize, Deserialize)]
-struct NumaNode {
+pub struct NumaNode {
     /// Node ID
-    id: i32,
+    pub id: i32,
     /// CPU list
-    cpus: Vec<u32>,
+    pub cpus: Vec<u32>,
     /// Memory size
-    memory: String,
+    pub memory: String,
     /// Devices attached to this node
-    devices: Vec<NumaDevice>,
+    pub devices: Vec<NumaDevice>,
     /// distances to other nodse (node_id _> distance)
-    distances: HashMap<String, u32>,
+    pub distances: HashMap<String, u32>,
 }
 
 /// Represents a device attached to a NUMA node
 #[derive(Debug, Serialize, Deserialize)]
-struct NumaDevice {
+pub struct NumaDevice {
     /// Device type (GPU, NIC, etc.)
-    type_: String,
+    pub type_: String,
     /// PCI ID
-    pci_id: String,
+    pub pci_id: String,
     /// Device name
-    name: String,
+    pub name: String,
 }
 
 /// Represents network information.
 #[derive(Debug, Serialize, Deserialize)]
-struct NetworkInfo {
+pub struct NetworkInfo {
     /// List of network interfaces.
-    interfaces: Vec<NetworkInterface>,
+    pub interfaces: Vec<NetworkInterface>,
     /// Infiniband information, if available.
-    infiniband: Option<InfinibandInfo>,
+    pub infiniband: Option<InfinibandInfo>,
 }
 
 /// Represents a network interface.
 #[derive(Debug, Serialize, Deserialize)]
-struct NetworkInterface {
+pub struct NetworkInterface {
     /// Interface name.
-    name: String,
+    pub name: String,
     /// MAC address.
-    mac: String,
+    pub mac: String,
     /// IP address.
-    ip: String,
+    pub ip: String,
     /// Interface speed.
-    speed: Option<String>,
+    pub speed: Option<String>,
     /// Interface type.
-    type_: String,
-    vendor: String,
-    model: String,
-    pci_id: String,
-    numa_node: Option<i32>,
+    pub type_: String,
+    pub vendor: String,
+    pub model: String,
+    pub pci_id: String,
+    pub numa_node: Option<i32>,
 }
 
 /// Represents Infiniband information.
 #[derive(Debug, Serialize, Deserialize)]
-struct InfinibandInfo {
+pub struct InfinibandInfo {
     /// List of Infiniband interfaces.
-    interfaces: Vec<IbInterface>,
+    pub interfaces: Vec<IbInterface>,
 }
 
 /// Represents an Infiniband interface.
 #[derive(Debug, Serialize, Deserialize)]
-struct IbInterface {
+pub struct IbInterface {
     /// Interface name.
-    name: String,
+    pub name: String,
     /// Port number.
-    port: u32,
+    pub port: u32,
     /// Interface state.
-    state: String,
+    pub state: String,
     /// Interface rate.
-    rate: String,
+    pub rate: String,
 }
 
 #[allow(dead_code)]
-struct NumaInfo {
-    nodes: Vec<NumaNode>,
+pub struct NumaInfo {
+    pub nodes: Vec<NumaNode>,
 }
 
 #[allow(unused_variables)]
@@ -578,7 +578,7 @@ impl ServerInfo {
     }
 
     /// Collects all server information
-    fn collect() -> Result<Self, Box<dyn Error>> {
+    pub fn collect() -> Result<Self, Box<dyn Error>> {
         // Check dependencies first
         let missing_packages = Self::check_dependencies()?;
 
@@ -771,7 +771,7 @@ impl ServerInfo {
     }
 
     /// Extracts a value from 'dmidecode' output without debug output
-    fn extract_dmidecode_value(text: &str, key: &str) -> Result<String, Box<dyn Error>> {
+    pub fn extract_dmidecode_value(text: &str, key: &str) -> Result<String, Box<dyn Error>> {
         let patterns = [
             format!(r"(?im)^\s*{}: (.*)$", regex::escape(key)),
             format!(r"(?im)^\s*{}\s+(.*)$", regex::escape(key)),

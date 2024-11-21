@@ -7,7 +7,11 @@
     <cargoProject FILE="$PROJECT_DIR$/Cargo.toml" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="e0e5b09d-07b9-4a14-8acb-d95f7fe73b90" name="Changes" comment="added numa devices" />
+    <list default="true" id="e0e5b09d-07b9-4a14-8acb-d95f7fe73b90" name="Changes" comment="added numa devices">
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/bin/hardware_report.rs" beforeDir="false" afterPath="$PROJECT_DIR$/src/bin/hardware_report.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/lib.rs" beforeDir="false" afterPath="$PROJECT_DIR$/src/lib.rs" afterDir="false" />
+    </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
     <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
@@ -45,7 +49,7 @@
     "RunOnceActivity.ShowReadmeOnStart": "true",
     "RunOnceActivity.git.unshallow": "true",
     "RunOnceActivity.rust.reset.selective.auto.import": "true",
-    "git-widget-placeholder": "main",
+    "git-widget-placeholder": "kenny/feat__library",
     "last_opened_file_path": "/Users/kennysheridan/Documents/san_francisco_compute/hardware_report",
     "node.js.detected.package.eslint": "true",
     "node.js.detected.package.tslint": "true",
@@ -108,6 +112,7 @@
       <updated>1730834885388</updated>
       <workItem from="1730834886489" duration="728000" />
       <workItem from="1730838989853" duration="6039000" />
+      <workItem from="1732207555962" duration="288000" />
     </task>
     <task id="LOCAL-00001" summary="added numa devices">
       <option name="closed" value="true" />
