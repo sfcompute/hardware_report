@@ -9,8 +9,7 @@
   <component name="ChangeListManager">
     <list default="true" id="e0e5b09d-07b9-4a14-8acb-d95f7fe73b90" name="Changes" comment="added numa devices">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/bin/hardware_report.rs" beforeDir="false" afterPath="$PROJECT_DIR$/src/bin/hardware_report.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/lib.rs" beforeDir="false" afterPath="$PROJECT_DIR$/src/lib.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Readme.md" beforeDir="false" afterPath="$PROJECT_DIR$/Readme.md" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -112,7 +111,7 @@
       <updated>1730834885388</updated>
       <workItem from="1730834886489" duration="728000" />
       <workItem from="1730838989853" duration="6039000" />
-      <workItem from="1732207555962" duration="288000" />
+      <workItem from="1732207555962" duration="1401000" />
     </task>
     <task id="LOCAL-00001" summary="added numa devices">
       <option name="closed" value="true" />
