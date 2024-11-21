@@ -7,9 +7,7 @@
     <cargoProject FILE="$PROJECT_DIR$/Cargo.toml" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="e0e5b09d-07b9-4a14-8acb-d95f7fe73b90" name="Changes" comment="added numa devices">
-      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-    </list>
+    <list default="true" id="e0e5b09d-07b9-4a14-8acb-d95f7fe73b90" name="Changes" comment="added numa devices" />
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
     <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
@@ -25,12 +23,12 @@
     &quot;assignee&quot;: &quot;kennethdsheridan&quot;
   }
 }</component>
-  <component name="GithubPullRequestsUISettings"><![CDATA[{
-  "selectedUrlAndAccountId": {
-    "url": "https://kennethdsheridan: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@github.com/sfcompute/hardware_report.git",
-    "accountId": "aecf467e-d4b5-4a18-b548-58fa0d87ca52"
+  <component name="GithubPullRequestsUISettings">{
+  &quot;selectedUrlAndAccountId&quot;: {
+    &quot;url&quot;: &quot;https://kennethdsheridan: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@github.com/sfcompute/hardware_report.git&quot;,
+    &quot;accountId&quot;: &quot;aecf467e-d4b5-4a18-b548-58fa0d87ca52&quot;
   }
-}]]></component>
+}</component>
   <component name="MacroExpansionManager">
     <option name="directoryName" value="9m4y8ovt" />
   </component>
@@ -47,7 +45,7 @@
     "RunOnceActivity.ShowReadmeOnStart": "true",
     "RunOnceActivity.git.unshallow": "true",
     "RunOnceActivity.rust.reset.selective.auto.import": "true",
-    "git-widget-placeholder": "kenny/network__gpu__info",
+    "git-widget-placeholder": "main",
     "last_opened_file_path": "/Users/kennysheridan/Documents/san_francisco_compute/hardware_report",
     "node.js.detected.package.eslint": "true",
     "node.js.detected.package.tslint": "true",
