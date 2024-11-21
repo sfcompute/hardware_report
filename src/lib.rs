@@ -92,7 +92,7 @@ struct ChassisInfo {
 
 /// Represents the overall server information
 #[derive(Debug, Serialize, Deserialize)]
-struct ServerInfo {
+pub struct ServerInfo {
     /// System summary
     summary: SystemSummary,
     /// Other fields remain the same
