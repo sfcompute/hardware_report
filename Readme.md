@@ -18,25 +18,6 @@ cargo build --release
 target/release/hardware_report
 ```
 
-### Use as a Library
-You can use `hardware_report` as a library in your Rust project. Add the following to your `Cargo.toml`:
-
-```toml
-[dependencies]
-hardware_report = { path = "../path/to/hardware_report" }
-```
-
-Then, in your Rust code:
-
-```rust
-use hardware_report::HardwareReport;
-
-fn main() {
-    let report = HardwareReport::new().expect("Failed to create hardware report");
-    report.print_summary();
-}
-```
-
 ## ⚠️ IMPORTANT BUILD REQUIREMENT ⚠️
 **DOCKER MUST BE RUNNING ON YOUR LOCAL MACHINE TO COMPILE FOR LINUX ON NON-LINUX SYSTEMS**
 **WITHOUT DOCKER RUNNING, THE BUILD WILL FAIL WHEN EXECUTING `make linux` ON macOS OR WINDOWS**
