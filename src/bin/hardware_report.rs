@@ -15,8 +15,6 @@ limitations under the License.
 */
 
 use std::error::Error;
-use std::fs;
-use std::io;
 use std::process::Command;
 
 use hardware_report::ServerInfo;
