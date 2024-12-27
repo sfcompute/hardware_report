@@ -1,6 +1,6 @@
 # Makefile for hardware_report - System Hardware Information Tool
 
-# Define the name of the binary
+# Define the name of the binary (must match your [[bin]] name in Cargo.toml)
 BINARY_NAME := hardware_report
 
 # Define the Rust compiler and Cargo
@@ -31,64 +31,84 @@ DOCKER_IMAGE := rust:latest
 UNAME_S := $(shell uname -s)
 UNAME_M := $(shell uname -m)
 
-# Check if Docker is available
-DOCKER_AVAILABLE := $(shell command -v docker 2> /dev/null)
+# Check if Docker is installed (non-empty if found)
+DOCKER_CMD := $(shell command -v docker 2> /dev/null)
 
-# Default target
+# Check if Docker is running (if installed). We'll store '1' if running, '0' otherwise
+DOCKER_RUNNING := $(shell if [ -n "$(DOCKER_CMD)" ]; then docker info >/dev/null 2>&1 && echo 1 || echo 0; else echo 0; fi)
+
+# Default target: build for both Linux and macOS on whichever platform we are on
 .PHONY: all
-all: 
+all:
 ifeq ($(UNAME_S),Darwin)
-ifeq ($(DOCKER_AVAILABLE),)
-	@echo "Docker is not available. Skipping Linux build and proceeding with macOS build only."
-	@$(MAKE) macos
-else
 	@$(MAKE) linux macos
-endif
-else
+else ifeq ($(UNAME_S),Linux)
 	@$(MAKE) linux macos
+else
+	@echo "Unsupported operating system: $(UNAME_S)"
+	@exit 1
 endif
 
 # Target for building Linux x86_64 binary
 .PHONY: linux
-linux:
+linux: install-tools
 	@echo "Building for Linux (x86_64)..."
 	@mkdir -p $(RELEASE_DIR)
-ifeq ($(UNAME_S),Linux)
-	@echo "Building natively on Linux..."
-	$(CARGO_BUILD) --target=$(LINUX_TARGET)
-	@cp target/$(LINUX_TARGET)/release/$(BINARY_NAME) $(RELEASE_DIR)/$(BINARY_NAME)-linux-x86_64
-else
-ifeq ($(DOCKER_AVAILABLE),)
-	@echo "Error: Docker is not available. Cannot build for Linux on non-Linux systems without Docker."
-	@exit 1
-else
+
+ifeq ($(UNAME_S),Darwin)
+	# On macOS → only cross-compile with Docker if Docker is running
+ifeq ($(DOCKER_RUNNING),1)
 	@echo "Cross-compiling for Linux using Docker..."
-	@docker run --rm -v $(PWD):/usr/src/myapp -w /usr/src/myapp --platform linux/amd64 $(DOCKER_IMAGE) \
+	docker run --rm \
+		-v "$(PWD)":/usr/src/myapp \
+		-w /usr/src/myapp \
+		--platform linux/amd64 \
+		$(DOCKER_IMAGE) \
 		bash -c "rustup target add $(LINUX_TARGET) && \
-		cargo build --release --target=$(LINUX_TARGET)"
-	@cp target/$(LINUX_TARGET)/release/$(BINARY_NAME) $(RELEASE_DIR)/$(BINARY_NAME)-linux-x86_64
+		         cargo build --release --target=$(LINUX_TARGET)"
+	@cp target/$(LINUX_TARGET)/release/$(BINARY_NAME) \
+		$(RELEASE_DIR)/$(BINARY_NAME)-linux-x86_64
 	@chmod +x $(RELEASE_DIR)/$(BINARY_NAME)-linux-x86_64
+	@echo "Linux binary built (docker cross-compile): $(RELEASE_DIR)/$(BINARY_NAME)-linux-x86_64"
+else
+	@echo "WARNING: Docker is not running or not available on macOS. Skipping Linux build."
 endif
+
+else ifeq ($(UNAME_S),Linux)
+	# On Linux → build natively, no Docker
+	$(CARGO_BUILD) --target=$(LINUX_TARGET)
+	@cp target/$(LINUX_TARGET)/release/$(BINARY_NAME) \
+		$(RELEASE_DIR)/$(BINARY_NAME)-linux-x86_64
+	@echo "Linux binary built (native): $(RELEASE_DIR)/$(BINARY_NAME)-linux-x86_64"
+else
+	@echo "Unsupported operating system for Linux build: $(UNAME_S)"
+	@exit 1
 endif
-	@echo "Linux binary built: $(RELEASE_DIR)/$(BINARY_NAME)-linux-x86_64"
+
 
 # Target for building macOS binary
 .PHONY: macos
-macos:
+macos: install-tools
 ifeq ($(UNAME_S),Darwin)
 	@echo "Building for macOS ($(UNAME_M))..."
 	@mkdir -p $(RELEASE_DIR)
-ifeq ($(UNAME_M),arm64)  # If on Apple Silicon
-	$(CARGO_BUILD) --target=aarch64-apple-darwin
-	@cp target/$(MACOS_TARGET)/release/$(BINARY_NAME) $(RELEASE_DIR)/$(BINARY_NAME)-macos-arm64
-else ifeq ($(UNAME_M),x86_64)  # If on Intel Mac
+ifeq ($(UNAME_M),arm64)
+	# Apple Silicon
+	$(CARGO_BUILD) --target=$(MACOS_TARGET)
+	@cp target/$(MACOS_TARGET)/release/$(BINARY_NAME) \
+		$(RELEASE_DIR)/$(BINARY_NAME)-macos-arm64
+	@echo "macOS binary built: $(RELEASE_DIR)/$(BINARY_NAME)-macos-arm64"
+else ifeq ($(UNAME_M),x86_64)
+	# Intel Mac
 	$(CARGO_BUILD) --target=x86_64-apple-darwin
-	@cp target/x86_64-apple-darwin/release/$(BINARY_NAME) $(RELEASE_DIR)/$(BINARY_NAME)-macos-x86_64
-endif
-	@echo "macOS binary built: $(RELEASE_DIR)/$(BINARY_NAME)-macos-$(UNAME_M)"
+	@cp target/x86_64-apple-darwin/release/$(BINARY_NAME) \
+		$(RELEASE_DIR)/$(BINARY_NAME)-macos-x86_64
+	@echo "macOS binary built: $(RELEASE_DIR)/$(BINARY_NAME)-macos-x86_64"
 else
-	@echo "Error: macOS build can only be performed on a Mac."
-	@exit 1
+	@echo "Unknown Mac architecture: $(UNAME_M)."
+endif
+else
+	@echo "Skipping macOS build because we're not on macOS."
 endif
 
 # Target for installing required tools
@@ -96,21 +116,22 @@ endif
 install-tools:
 	@echo "Installing required tools..."
 	rustup target add $(LINUX_TARGET)
+
 ifeq ($(UNAME_S),Darwin)
 	rustup target add $(MACOS_TARGET)
-ifeq ($(UNAME_M),x86_64)
-	@echo "Note: For cross-compilation to ARM64, additional setup may be required."
-endif
-ifeq ($(DOCKER_AVAILABLE),)
-	@echo "Warning: Docker is not installed. It is required for building Linux binaries on macOS."
+
+	# Only pull Docker image if Docker is installed & running
+ifeq ($(DOCKER_RUNNING),1)
+	@echo "Docker is running on macOS...pulling image for cross-builds."
+	docker pull --platform linux/amd64 $(DOCKER_IMAGE) || true
 else
-	@echo "Docker is available for Linux builds."
-	docker pull --platform linux/amd64 $(DOCKER_IMAGE)
+	@echo "Docker not running (or not installed). Will skip Docker-based Linux builds."
 endif
+
 else ifeq ($(UNAME_S),Linux)
-	@echo "Building on Linux, no additional tools needed."
+	@echo "Building on Linux natively. No Docker usage needed."
 else
-	@echo "Unsupported operating system"
+	@echo "Unsupported operating system: $(UNAME_S)"
 	@exit 1
 endif
 
@@ -144,9 +165,9 @@ clean:
 .PHONY: help
 help:
 	@echo "Available targets:"
-	@echo "  all          - Build for all platforms (default)"
-	@echo "  linux        - Build for Linux x86_64"
-	@echo "  macos        - Build for macOS (native architecture)"
+	@echo "  all          - Build for both Linux and macOS on your current platform"
+	@echo "  linux        - Build for Linux x86_64 (Docker on macOS if running, native on Linux)"
+	@echo "  macos        - Build for macOS (only works on an actual Mac)"
 	@echo "  test         - Run tests"
 	@echo "  fmt          - Check code format"
 	@echo "  lint         - Run clippy linter"
@@ -155,5 +176,3 @@ help:
 	@echo "  install-tools- Install required build tools"
 	@echo "  help         - Show this help message"
 
-# Ensure all required tools are installed before building
-linux macos: install-tools
