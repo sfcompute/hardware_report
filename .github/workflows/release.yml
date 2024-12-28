@@ -2,13 +2,10 @@ name: Release Build
 
 on:
   push:
-    # Trigger on version tags
     tags:
       - 'v*.*.*'
-  # Allow manual trigger
   workflow_dispatch:
 
-# Add permissions block
 permissions:
   contents: write
   packages: write
@@ -59,22 +56,28 @@ jobs:
             pciutils \
             ethtool \
             dmidecode \
-            ipmitool
+            ipmitool \
+            musl-tools  # <-- Add musl-tools so we can build musl binaries
 
       - name: Install Rust toolchain
         uses: actions-rs/toolchain@v1
         with:
           toolchain: stable
-          target: x86_64-unknown-linux-gnu
           override: true
+          # Add the musl target
+          target: x86_64-unknown-linux-musl
 
-      - name: Build Release Binary
+      - name: Build Release Binary (musl)
         run: |
-          cargo build --release --target x86_64-unknown-linux-gnu
+          cargo build --release --target x86_64-unknown-linux-musl
           mkdir -p build/release
-          cp target/x86_64-unknown-linux-gnu/release/hardware_report build/release/hardware_report-linux-x86_64
-          strip build/release/hardware_report-linux-x86_64
           
+          # Rename the musl-based binary
+          cp target/x86_64-unknown-linux-musl/release/hardware_report build/release/hardware_report-linux-x86_64
+          
+          # Optional: 'strip' the binary to reduce size
+          strip build/release/hardware_report-linux-x86_64
+
       - name: Create tarball
         run: |
           cd build/release
@@ -100,3 +103,4 @@ jobs:
           asset_path: build/release/hardware_report-linux-x86_64-${{ needs.create-release.outputs.version }}.tar.gz.sha256
           asset_name: hardware_report-linux-x86_64-${{ needs.create-release.outputs.version }}.tar.gz.sha256
           asset_content_type: text/plain
+
