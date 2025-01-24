@@ -21,11 +21,18 @@ pub async fn post_data(
     labels: HashMap<String, String>,
     endpoint: &str,
     auth_token: Option<&str>,
+    write_payload_to: Option<&str>,
 ) -> Result<(), Box<dyn Error>> {
     let payload = PostPayload {
         labels,
         result: data,
     };
+
+    // Write payload to file if path is provided
+    if let Some(path) = write_payload_to {
+        std::fs::write(path, serde_json::to_string_pretty(&payload)?)?;
+        println!("\nPayload has been saved to {}", path);
+    }
 
     let mut request = reqwest::Client::new().post(endpoint).json(&payload);
 

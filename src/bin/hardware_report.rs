@@ -272,9 +272,10 @@ async fn main() -> Result<(), Box<dyn Error>> {
             labels,
             &opt.endpoint,
             opt.auth_token.as_deref(),
+            opt.save_payload.as_deref(),
         )
         .await?;
-        println!("Successfully posted data to remote server");
+        println!("\nSuccessfully posted data to remote server");
     }
 
     Ok(())
