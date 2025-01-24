@@ -58,6 +58,12 @@ pub struct MotherboardInfo {
     pub type_: String,
 }
 
+#[derive(Debug)]
+pub struct SystemInfo {
+    pub uuid: String,
+    pub serial: String,
+}
+
 /// Summary of key system components
 #[derive(Debug, Serialize, Deserialize)]
 pub struct SystemSummary {
@@ -641,6 +647,40 @@ impl ServerInfo {
         Ok(addresses)
     }
 
+    /// Gets system UUID and serial from dmidecode
+    fn get_system_info() -> Result<SystemInfo, Box<dyn Error>> {
+        let output = match Command::new("dmidecode").args(&["-t", "system"]).output() {
+            Ok(out) => {
+                if !out.status.success() {
+                    Command::new("sudo")
+                        .args(&["dmidecode", "-t", "system"])
+                        .output()?
+                } else {
+                    out
+                }
+            }
+            Err(_) => Command::new("sudo")
+                .args(&["dmidecode", "-t", "system"])
+                .output()?,
+        };
+
+        let stdout = String::from_utf8_lossy(&output.stdout);
+
+        if !output.status.success() || stdout.trim().is_empty() {
+            return Ok(SystemInfo {
+                uuid: "Unknown".to_string(),
+                serial: "Unknown".to_string(),
+            });
+        }
+
+        let uuid = Self::extract_dmidecode_value(&stdout, "UUID")
+            .unwrap_or_else(|_| "Unknown".to_string());
+        let serial = Self::extract_dmidecode_value(&stdout, "Serial Number")
+            .unwrap_or_else(|_| "Unknown".to_string());
+
+        Ok(SystemInfo { uuid, serial })
+    }
+
     /// Collects all server information
     pub fn collect() -> Result<Self, Box<dyn Error>> {
         // Check dependencies first
@@ -669,27 +709,11 @@ impl ServerInfo {
         let hostname = Self::get_hostname()?;
         let hardware = Self::collect_hardware_info()?;
         let network = Self::collect_network_info()?;
+        let system_info = Self::get_system_info()?;
         let (bmc_ip, bmc_mac) = Self::collect_ipmi_info()?;
         let os_ip = Self::collect_ip_addresses()?;
 
-        // Get system UUID and serial from dmidecode
-        let output = Command::new("dmidecode").args(&["-t", "system"]).output()?;
-        let system_str = String::from_utf8(output.stdout)?;
-
-        let uuid_re = Regex::new(r"UUID:\s*([^\n]+)")?;
-        let serial_re = Regex::new(r"Serial Number:\s*([^\n]+)")?;
-
-        let system_uuid = uuid_re
-            .captures(&system_str)
-            .map_or("Unknown".to_string(), |cap| cap[1].trim().to_string());
-
-        let system_serial = serial_re
-            .captures(&system_str)
-            .map_or("Unknown".to_string(), |cap| cap[1].trim().to_string());
-
-        let mut summary = Self::generate_summary(&hardware, &network)?;
-        summary.system_uuid = system_uuid;
-        summary.system_serial = system_serial;
+        let summary = Self::generate_summary(&hardware, &network, &system_info)?;
 
         Ok(ServerInfo {
             summary,
@@ -933,6 +957,7 @@ impl ServerInfo {
     fn generate_summary(
         hardware: &HardwareInfo,
         network: &NetworkInfo,
+        system_info: &SystemInfo,
     ) -> Result<SystemSummary, Box<dyn Error>> {
         let bios = Self::get_bios_info().unwrap_or_else(|_| BiosInfo {
             vendor: "Unknown Vendor".to_string(),
@@ -996,8 +1021,8 @@ impl ServerInfo {
             numa_topology: Self::collect_numa_topology()?,
             cpu_topology,
             cpu_summary,
-            system_uuid: "Unknown".to_string(),
-            system_serial: "Unknown".to_string(),
+            system_uuid: system_info.uuid.clone(),
+            system_serial: system_info.serial.clone(),
         })
     }
 
