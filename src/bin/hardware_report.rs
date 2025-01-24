@@ -16,9 +16,37 @@ limitations under the License.
 
 use hardware_report::posting::post_data;
 use hardware_report::ServerInfo;
+use std::collections::HashMap;
 use std::error::Error;
 use std::process::Command;
 use structopt::StructOpt;
+
+#[derive(Debug)]
+enum FileFormat {
+    TOML,
+    JSON,
+}
+
+impl std::str::FromStr for FileFormat {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s.to_uppercase().as_str() {
+            "TOML" => Ok(FileFormat::TOML),
+            "JSON" => Ok(FileFormat::JSON),
+            _ => Err("File format must be either 'toml' or 'json'".to_string()),
+        }
+    }
+}
+
+impl std::fmt::Display for FileFormat {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match self {
+            FileFormat::TOML => write!(f, "TOML"),
+            FileFormat::JSON => write!(f, "JSON"),
+        }
+    }
+}
 
 #[derive(StructOpt)]
 #[structopt(name = "hardware_report")]
@@ -34,6 +62,27 @@ struct Opt {
     /// Authentication token
     #[structopt(long, env = "HARDWARE_REPORT_TOKEN")]
     auth_token: Option<String>,
+
+    /// Labels in key=value format (only included in POST payload, not in output file)
+    #[structopt(long = "label", parse(try_from_str = parse_label))]
+    labels: Vec<(String, String)>,
+
+    /// Output file format (toml or json)
+    #[structopt(long, default_value = "toml")]
+    file_format: FileFormat,
+
+    /// Save POST payload to specified file for debugging (only works with --post)
+    #[structopt(long)]
+    save_payload: Option<String>,
+}
+
+fn parse_label(s: &str) -> Result<(String, String), String> {
+    let parts: Vec<&str> = s.split('=').collect();
+    if parts.len() == 2 {
+        Ok((parts[0].to_string(), parts[1].to_string()))
+    } else {
+        Err("Label must be in key=value format".to_string())
+    }
 }
 
 #[tokio::main]
@@ -193,23 +242,38 @@ async fn main() -> Result<(), Box<dyn Error>> {
     }
 
     println!(
-        "\nCreating TOML output for system serial number: {}",
-        safe_filename
+        "\nCreating {} output for system serial number: {}",
+        opt.file_format, safe_filename
     );
 
-    let output_filename = format!("{}_hardware_report.toml", safe_filename);
+    let output_filename = format!(
+        "{}_hardware_report.{}",
+        safe_filename,
+        match opt.file_format {
+            FileFormat::TOML => "toml",
+            FileFormat::JSON => "json",
+        }
+    );
 
-    // Convert to TOML
-    let toml_string = toml::to_string_pretty(&server_info)?;
+    // Convert to specified format and write to file
+    let output_string = match opt.file_format {
+        FileFormat::TOML => toml::to_string_pretty(&server_info)?,
+        FileFormat::JSON => serde_json::to_string_pretty(&server_info)?,
+    };
 
-    // Write to file
-    std::fs::write(&output_filename, toml_string)?;
-
+    std::fs::write(&output_filename, output_string)?;
     println!("Configuration has been written to {}", output_filename);
 
     // Handle posting if enabled
     if opt.post {
-        post_data(&server_info, &opt.endpoint, opt.auth_token.as_deref()).await?;
+        let labels: HashMap<String, String> = opt.labels.into_iter().collect();
+        post_data(
+            server_info,
+            labels,
+            &opt.endpoint,
+            opt.auth_token.as_deref(),
+        )
+        .await?;
         println!("Successfully posted data to remote server");
     }
 
