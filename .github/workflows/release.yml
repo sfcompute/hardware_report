@@ -57,7 +57,7 @@ jobs:
             ethtool \
             dmidecode \
             ipmitool \
-            pkg-configs \
+            pkg-config \
             libssl-dev \
             musl-tools  # <-- Add musl-tools so we can build musl binaries
 
