@@ -56,7 +56,7 @@ struct Opt {
     post: bool,
 
     /// Remote endpoint URL
-    #[structopt(long, default_value = "https://example.com/toml")]
+    #[structopt(long, default_value = "")]
     endpoint: String,
 
     /// Authentication token
