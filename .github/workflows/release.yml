@@ -61,8 +61,7 @@ jobs:
             libssl-dev \
             musl-tools  \
             musl-dev \
-            libssl-dev:amd64 \
-            musl-libc
+            libssl-dev:amd64
 
       - name: Install Rust toolchain
         uses: actions-rs/toolchain@v1
