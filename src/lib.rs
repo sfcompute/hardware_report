@@ -759,10 +759,10 @@ impl ServerInfo {
     /// Calculates total storage capacity
     fn calculate_total_storage(storage: &StorageInfo) -> Result<String, Box<dyn Error>> {
         let mut total_bytes: u64 = 0;
+        let re = Regex::new(r"(\d+(?:\.\d+)?)(B|K|M|G|T)")?;
 
         for device in &storage.devices {
             let size_str = device.size.replace(" ", "");
-            let re = Regex::new(r"(\d+(?:\.\d+)?)(B|K|M|G|T)")?;
 
             if let Some(caps) = re.captures(&size_str) {
                 let value: f64 = caps[1].parse()?;

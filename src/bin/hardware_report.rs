@@ -23,8 +23,8 @@ use structopt::StructOpt;
 
 #[derive(Debug)]
 enum FileFormat {
-    TOML,
-    JSON,
+    Toml,
+    Json,
 }
 
 impl std::str::FromStr for FileFormat {
@@ -32,8 +32,8 @@ impl std::str::FromStr for FileFormat {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s.to_uppercase().as_str() {
-            "TOML" => Ok(FileFormat::TOML),
-            "JSON" => Ok(FileFormat::JSON),
+            "TOML" => Ok(FileFormat::Toml),
+            "JSON" => Ok(FileFormat::Json),
             _ => Err("File format must be either 'toml' or 'json'".to_string()),
         }
     }
@@ -42,8 +42,8 @@ impl std::str::FromStr for FileFormat {
 impl std::fmt::Display for FileFormat {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
-            FileFormat::TOML => write!(f, "TOML"),
-            FileFormat::JSON => write!(f, "JSON"),
+            FileFormat::Toml => write!(f, "TOML"),
+            FileFormat::Json => write!(f, "JSON"),
         }
     }
 }
@@ -250,15 +250,15 @@ async fn main() -> Result<(), Box<dyn Error>> {
         "{}_hardware_report.{}",
         safe_filename,
         match opt.file_format {
-            FileFormat::TOML => "toml",
-            FileFormat::JSON => "json",
+            FileFormat::Toml => "toml",
+            FileFormat::Json => "json",
         }
     );
 
     // Convert to specified format and write to file
     let output_string = match opt.file_format {
-        FileFormat::TOML => toml::to_string_pretty(&server_info)?,
-        FileFormat::JSON => serde_json::to_string_pretty(&server_info)?,
+        FileFormat::Toml => toml::to_string_pretty(&server_info)?,
+        FileFormat::Json => serde_json::to_string_pretty(&server_info)?,
     };
 
     std::fs::write(&output_filename, output_string)?;
