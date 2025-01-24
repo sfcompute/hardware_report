@@ -28,11 +28,17 @@ It gathers information such as:
 The collected data is written to `server_config.toml`.
 */
 
+use lazy_static::lazy_static;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 use std::error::Error;
 use std::process::Command;
+
+lazy_static! {
+    static ref STORAGE_SIZE_RE: Regex = Regex::new(r"(\d+(?:\.\d+)?)(B|K|M|G|T)").unwrap();
+    static ref NETWORK_SPEED_RE: Regex = Regex::new(r"Speed:\s+(\S+)").unwrap();
+}
 
 /// CPU topology information
 #[derive(Debug, Serialize, Deserialize)]
@@ -1287,12 +1293,9 @@ impl ServerInfo {
                     let speed = match Command::new("ethtool").arg(name).output() {
                         Ok(output) => {
                             let output_str = String::from_utf8(output.stdout)?;
-                            let re_speed = Regex::new(r"Speed:\s+(\S+)")?;
-                            if let Some(cap) = re_speed.captures(&output_str) {
-                                Some(cap[1].to_string())
-                            } else {
-                                None
-                            }
+                            NETWORK_SPEED_RE
+                                .captures(&output_str)
+                                .map(|cap| cap[1].to_string())
                         }
                         Err(_) => None,
                     };

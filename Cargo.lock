@@ -600,6 +600,7 @@ dependencies = [
  "assert_fs",
  "clap 4.5.20",
  "env_logger",
+ "lazy_static",
  "libc",
  "log",
  "predicates",
