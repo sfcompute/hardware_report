@@ -266,6 +266,11 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
     // Handle posting if enabled
     if opt.post {
+        // Validate endpoint when posting is enabled
+        if opt.endpoint.trim().is_empty() {
+            return Err("Endpoint URL is required when --post is enabled".into());
+        }
+
         let labels: HashMap<String, String> = opt.labels.into_iter().collect();
         post_data(
             server_info,
