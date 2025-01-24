@@ -123,7 +123,7 @@ pub struct ServerInfo {
     pub summary: SystemSummary,
     /// Other fields remain the same
     pub hostname: String,
-    pub os_ip: HashMap<String, String>,
+    pub os_ip: Vec<InterfaceIPs>,
     pub bmc_ip: Option<String>,
     pub bmc_mac: Option<String>,
     pub hardware: HardwareInfo,
@@ -310,6 +310,12 @@ pub struct NumaInfo {
 }
 
 pub mod posting;
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct InterfaceIPs {
+    pub interface: String,
+    pub ip_addresses: Vec<String>,
+}
 
 #[allow(unused_variables)]
 #[allow(unused_assignments)]
@@ -616,35 +622,42 @@ impl ServerInfo {
         Ok(nodes)
     }
 
-    fn collect_ip_addresses() -> Result<HashMap<String, String>, Box<dyn Error>> {
-        let output = Command::new("ip").args(&["-j", "addr", "show"]).output()?;
+    fn collect_ip_addresses() -> Result<Vec<InterfaceIPs>, Box<dyn Error>> {
+        let output = Command::new("ip").args(&["-j", "addr"]).output()?;
         let json: serde_json::Value = serde_json::from_slice(&output.stdout)?;
-        let mut addresses = HashMap::new();
 
-        if let Some(interfaces) = json.as_array() {
-            for interface in interfaces {
-                if let (Some(name), Some(addr_info)) = (
-                    interface["ifname"].as_str(),
-                    interface["addr_info"].as_array(),
-                ) {
-                    // Skip loopback interface
+        let mut interfaces = Vec::new();
+
+        if let Some(ifaces) = json.as_array() {
+            for iface in ifaces {
+                if let Some(name) = iface["ifname"].as_str() {
                     if name == "lo" {
                         continue;
-                    }
+                    } // Skip loopback
 
-                    for addr in addr_info {
-                        if let Some(ip) = addr["local"].as_str() {
+                    let mut ip_addresses = Vec::new();
+
+                    if let Some(addr_info) = iface["addr_info"].as_array() {
+                        for addr in addr_info {
                             if addr["family"].as_str() == Some("inet") {
-                                addresses.insert(name.to_string(), ip.to_string());
-                                break; // Take first IPv4 address only
+                                if let Some(ip) = addr["local"].as_str() {
+                                    ip_addresses.push(ip.to_string());
+                                }
                             }
                         }
+                    }
+
+                    if !ip_addresses.is_empty() {
+                        interfaces.push(InterfaceIPs {
+                            interface: name.to_string(),
+                            ip_addresses,
+                        });
                     }
                 }
             }
         }
 
-        Ok(addresses)
+        Ok(interfaces)
     }
 
     /// Gets system UUID and serial from dmidecode
