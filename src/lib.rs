@@ -61,6 +61,10 @@ pub struct MotherboardInfo {
 /// Summary of key system components
 #[derive(Debug, Serialize, Deserialize)]
 pub struct SystemSummary {
+    /// System UUID
+    pub system_uuid: String,
+    /// System Serial Number
+    pub system_serial: String,
     /// Total system memory capacity
     pub total_memory: String,
     /// Memory speed and type
@@ -298,6 +302,8 @@ pub struct IbInterface {
 pub struct NumaInfo {
     pub nodes: Vec<NumaNode>,
 }
+
+pub mod posting;
 
 #[allow(unused_variables)]
 #[allow(unused_assignments)]
@@ -666,7 +672,24 @@ impl ServerInfo {
         let (bmc_ip, bmc_mac) = Self::collect_ipmi_info()?;
         let os_ip = Self::collect_ip_addresses()?;
 
-        let summary = Self::generate_summary(&hardware, &network)?;
+        // Get system UUID and serial from dmidecode
+        let output = Command::new("dmidecode").args(&["-t", "system"]).output()?;
+        let system_str = String::from_utf8(output.stdout)?;
+
+        let uuid_re = Regex::new(r"UUID:\s*([^\n]+)")?;
+        let serial_re = Regex::new(r"Serial Number:\s*([^\n]+)")?;
+
+        let system_uuid = uuid_re
+            .captures(&system_str)
+            .map_or("Unknown".to_string(), |cap| cap[1].trim().to_string());
+
+        let system_serial = serial_re
+            .captures(&system_str)
+            .map_or("Unknown".to_string(), |cap| cap[1].trim().to_string());
+
+        let mut summary = Self::generate_summary(&hardware, &network)?;
+        summary.system_uuid = system_uuid;
+        summary.system_serial = system_serial;
 
         Ok(ServerInfo {
             summary,
@@ -973,6 +996,8 @@ impl ServerInfo {
             numa_topology: Self::collect_numa_topology()?,
             cpu_topology,
             cpu_summary,
+            system_uuid: "Unknown".to_string(),
+            system_serial: "Unknown".to_string(),
         })
     }
 

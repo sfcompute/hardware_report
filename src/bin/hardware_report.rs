@@ -14,22 +14,41 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+use hardware_report::posting::post_data;
+use hardware_report::ServerInfo;
 use std::error::Error;
 use std::process::Command;
+use structopt::StructOpt;
 
-use hardware_report::ServerInfo;
+#[derive(StructOpt)]
+#[structopt(name = "hardware_report")]
+struct Opt {
+    /// Enable posting to remote server
+    #[structopt(long)]
+    post: bool,
 
-fn main() -> Result<(), Box<dyn Error>> {
+    /// Remote endpoint URL
+    #[structopt(long, default_value = "https://example.com/toml")]
+    endpoint: String,
+
+    /// Authentication token
+    #[structopt(long, env = "HARDWARE_REPORT_TOKEN")]
+    auth_token: Option<String>,
+}
+
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn Error>> {
+    let opt = Opt::from_args();
+
     // Collect server information
     let server_info = ServerInfo::collect()?;
 
     // Generate summary output for console
     println!("System Summary:");
     println!("==============");
-
-    // Print the system Hostname
     println!("Hostname: {}", server_info.hostname);
-
+    println!("System UUID: {}", server_info.summary.system_uuid);
+    println!("System Serial: {}", server_info.summary.system_serial);
     println!("CPU: {}", server_info.summary.cpu_summary);
     println!(
         "Total: {} Cores, {} Threads",
@@ -156,7 +175,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         }
     }
 
-    // Get chassis serial number ans sanitize it for use as the file_name
+    // Get chassis serial number and sanitize it for use as the file_name
     let chassis_serial = server_info.summary.chassis.serial.clone();
     let safe_filename = sanitize_filename(&chassis_serial);
 
@@ -187,6 +206,12 @@ fn main() -> Result<(), Box<dyn Error>> {
     std::fs::write(&output_filename, toml_string)?;
 
     println!("Configuration has been written to {}", output_filename);
+
+    // Handle posting if enabled
+    if opt.post {
+        post_data(&server_info, &opt.endpoint, opt.auth_token.as_deref()).await?;
+        println!("Successfully posted data to remote server");
+    }
 
     Ok(())
 }
