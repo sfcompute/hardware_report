@@ -59,7 +59,7 @@ jobs:
             ipmitool \
             pkg-config \
             libssl-dev \
-            musl-tools  \ # <-- Add musl-tools so we can build musl binaries
+            musl-tools  \
             musl-dev \
             libssl-dev:amd64 \
             musl-libc
