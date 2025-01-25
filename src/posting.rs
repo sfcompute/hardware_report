@@ -30,8 +30,15 @@ pub async fn post_data(
 
     // Write payload to file if path is provided
     if let Some(path) = write_payload_to {
-        std::fs::write(path, serde_json::to_string_pretty(&payload)?)?;
-        println!("\nPayload has been saved to {}", path);
+        match std::fs::write(path, serde_json::to_string_pretty(&payload)?) {
+            Ok(_) => println!("Successfully saved payload to {}", path),
+            Err(e) => eprintln!("Failed to write payload to {}: {}", path, e),
+        }
+    }
+
+    // Validate endpoint when posting is enabled
+    if endpoint.trim().is_empty() {
+        return Err("Endpoint URL is required when --post is enabled".into());
     }
 
     let mut request = reqwest::Client::new().post(endpoint).json(&payload);

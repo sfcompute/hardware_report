@@ -96,8 +96,8 @@ async fn main() -> Result<(), Box<dyn Error>> {
     println!("System Summary:");
     println!("==============");
     println!("Hostname: {}", server_info.hostname);
-    println!("System UUID: {}", server_info.summary.system_uuid);
-    println!("System Serial: {}", server_info.summary.system_serial);
+    println!("System UUID: {}", server_info.summary.system_info.uuid);
+    println!("System Serial: {}", server_info.summary.system_info.serial);
     println!("CPU: {}", server_info.summary.cpu_summary);
     println!(
         "Total: {} Cores, {} Threads",
@@ -266,11 +266,6 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
     // Handle posting if enabled
     if opt.post {
-        // Validate endpoint when posting is enabled
-        if opt.endpoint.trim().is_empty() {
-            return Err("Endpoint URL is required when --post is enabled".into());
-        }
-
         let labels: HashMap<String, String> = opt.labels.into_iter().collect();
         post_data(
             server_info,

@@ -64,19 +64,19 @@ pub struct MotherboardInfo {
     pub type_: String,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct SystemInfo {
     pub uuid: String,
     pub serial: String,
+    pub product_name: String,
+    pub product_manufacturer: String,
 }
 
 /// Summary of key system components
 #[derive(Debug, Serialize, Deserialize)]
 pub struct SystemSummary {
-    /// System UUID
-    pub system_uuid: String,
-    /// System Serial Number
-    pub system_serial: String,
+    /// System information
+    pub system_info: SystemInfo,
     /// Total system memory capacity
     pub total_memory: String,
     /// Memory speed and type
@@ -689,6 +689,8 @@ impl ServerInfo {
             return Ok(SystemInfo {
                 uuid: "Unknown".to_string(),
                 serial: "Unknown".to_string(),
+                product_name: "Unknown".to_string(),
+                product_manufacturer: "Unknown".to_string(),
             });
         }
 
@@ -696,8 +698,17 @@ impl ServerInfo {
             .unwrap_or_else(|_| "Unknown".to_string());
         let serial = Self::extract_dmidecode_value(&stdout, "Serial Number")
             .unwrap_or_else(|_| "Unknown".to_string());
+        let product_name = Self::extract_dmidecode_value(&stdout, "Product Name")
+            .unwrap_or_else(|_| "Unknown".to_string());
+        let product_manufacturer = Self::extract_dmidecode_value(&stdout, "Manufacturer")
+            .unwrap_or_else(|_| "Unknown".to_string());
 
-        Ok(SystemInfo { uuid, serial })
+        Ok(SystemInfo {
+            uuid,
+            serial,
+            product_name,
+            product_manufacturer,
+        })
     }
 
     /// Collects all server information
@@ -1027,6 +1038,12 @@ impl ServerInfo {
         let total_storage_tb = Self::calculate_total_storage_tb(&hardware.storage)?;
 
         Ok(SystemSummary {
+            system_info: SystemInfo {
+                uuid: system_info.uuid.clone(),
+                serial: system_info.serial.clone(),
+                product_name: system_info.product_name.clone(),
+                product_manufacturer: system_info.product_manufacturer.clone(),
+            },
             total_memory: hardware.memory.total.clone(),
             memory_config: format!("{} @ {}", hardware.memory.type_, hardware.memory.speed),
             total_storage_tb,
@@ -1040,8 +1057,6 @@ impl ServerInfo {
             numa_topology: Self::collect_numa_topology()?,
             cpu_topology,
             cpu_summary,
-            system_uuid: system_info.uuid.clone(),
-            system_serial: system_info.serial.clone(),
         })
     }
 
