@@ -480,7 +480,7 @@ impl ServerInfo {
 
     /// Gets hostname of the server
     fn get_hostname() -> Result<String, Box<dyn Error>> {
-        let output = Command::new("hostname").output()?;
+        let output = Command::new("hostname").args(&["-f"]).output()?;
         Ok(String::from_utf8(output.stdout)?.trim().to_string())
     }
 
