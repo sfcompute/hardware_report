@@ -22,6 +22,7 @@ pub async fn post_data(
     endpoint: &str,
     auth_token: Option<&str>,
     write_payload_to: Option<&str>,
+    skip_tls_verify: bool,
 ) -> Result<(), Box<dyn Error>> {
     let payload = PostPayload {
         labels,
@@ -41,7 +42,11 @@ pub async fn post_data(
         return Err("Endpoint URL is required when --post is enabled".into());
     }
 
-    let mut request = reqwest::Client::new().post(endpoint).json(&payload);
+    // Create a client with optional TLS verification
+    let client = reqwest::Client::builder()
+        .danger_accept_invalid_certs(skip_tls_verify)
+        .build()?;
+    let mut request = client.post(endpoint).json(&payload);
 
     if let Some(token) = auth_token {
         request = request.header("Authorization", format!("Bearer {}", token));

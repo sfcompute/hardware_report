@@ -74,6 +74,10 @@ struct Opt {
     /// Save POST payload to specified file for debugging (only works with --post)
     #[structopt(long)]
     save_payload: Option<String>,
+
+    /// Skip TLS certificate verification (not recommended for production use)
+    #[structopt(long)]
+    skip_tls_verify: bool,
 }
 
 fn parse_label(s: &str) -> Result<(String, String), String> {
@@ -273,6 +277,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
             &opt.endpoint,
             opt.auth_token.as_deref(),
             opt.save_payload.as_deref(),
+            opt.skip_tls_verify,
         )
         .await?;
         println!("\nSuccessfully posted data to remote server");
