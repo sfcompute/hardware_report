@@ -2,9 +2,9 @@ name: Test
 
 on:
   pull_request:
-    branches: [ main ]
+    branches: [main]
   push:
-    branches: [ main ]
+    branches: [main]
 
 env:
   CARGO_TERM_COLOR: always
@@ -28,7 +28,10 @@ jobs:
             pciutils \
             ethtool \
             dmidecode \
-            ipmitool
+            ipmitool \
+            pkg-config \
+            libssl-dev \
+            musl-tools
 
       - name: Install Rust toolchain
         uses: actions-rs/toolchain@v1

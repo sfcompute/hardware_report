@@ -28,11 +28,17 @@ It gathers information such as:
 The collected data is written to `server_config.toml`.
 */
 
+use lazy_static::lazy_static;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 use std::error::Error;
 use std::process::Command;
+
+lazy_static! {
+    static ref STORAGE_SIZE_RE: Regex = Regex::new(r"(\d+(?:\.\d+)?)(B|K|M|G|T)").unwrap();
+    static ref NETWORK_SPEED_RE: Regex = Regex::new(r"Speed:\s+(\S+)").unwrap();
+}
 
 /// CPU topology information
 #[derive(Debug, Serialize, Deserialize)]
@@ -58,9 +64,19 @@ pub struct MotherboardInfo {
     pub type_: String,
 }
 
+#[derive(Debug, Serialize, Deserialize)]
+pub struct SystemInfo {
+    pub uuid: String,
+    pub serial: String,
+    pub product_name: String,
+    pub product_manufacturer: String,
+}
+
 /// Summary of key system components
 #[derive(Debug, Serialize, Deserialize)]
 pub struct SystemSummary {
+    /// System information
+    pub system_info: SystemInfo,
     /// Total system memory capacity
     pub total_memory: String,
     /// Memory speed and type
@@ -113,7 +129,7 @@ pub struct ServerInfo {
     pub summary: SystemSummary,
     /// Other fields remain the same
     pub hostname: String,
-    pub os_ip: HashMap<String, String>,
+    pub os_ip: Vec<InterfaceIPs>,
     pub bmc_ip: Option<String>,
     pub bmc_mac: Option<String>,
     pub hardware: HardwareInfo,
@@ -299,6 +315,14 @@ pub struct NumaInfo {
     pub nodes: Vec<NumaNode>,
 }
 
+pub mod posting;
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct InterfaceIPs {
+    pub interface: String,
+    pub ip_addresses: Vec<String>,
+}
+
 #[allow(unused_variables)]
 #[allow(unused_assignments)]
 #[allow(clippy::useless_format)]
@@ -456,7 +480,7 @@ impl ServerInfo {
 
     /// Gets hostname of the server
     fn get_hostname() -> Result<String, Box<dyn Error>> {
-        let output = Command::new("hostname").output()?;
+        let output = Command::new("hostname").args(&["-f"]).output()?;
         Ok(String::from_utf8(output.stdout)?.trim().to_string())
     }
 
@@ -604,35 +628,87 @@ impl ServerInfo {
         Ok(nodes)
     }
 
-    fn collect_ip_addresses() -> Result<HashMap<String, String>, Box<dyn Error>> {
-        let output = Command::new("ip").args(&["-j", "addr", "show"]).output()?;
+    fn collect_ip_addresses() -> Result<Vec<InterfaceIPs>, Box<dyn Error>> {
+        let output = Command::new("ip").args(&["-j", "addr"]).output()?;
         let json: serde_json::Value = serde_json::from_slice(&output.stdout)?;
-        let mut addresses = HashMap::new();
 
-        if let Some(interfaces) = json.as_array() {
-            for interface in interfaces {
-                if let (Some(name), Some(addr_info)) = (
-                    interface["ifname"].as_str(),
-                    interface["addr_info"].as_array(),
-                ) {
-                    // Skip loopback interface
+        let mut interfaces = Vec::new();
+
+        if let Some(ifaces) = json.as_array() {
+            for iface in ifaces {
+                if let Some(name) = iface["ifname"].as_str() {
                     if name == "lo" {
                         continue;
-                    }
+                    } // Skip loopback
 
-                    for addr in addr_info {
-                        if let Some(ip) = addr["local"].as_str() {
+                    let mut ip_addresses = Vec::new();
+
+                    if let Some(addr_info) = iface["addr_info"].as_array() {
+                        for addr in addr_info {
                             if addr["family"].as_str() == Some("inet") {
-                                addresses.insert(name.to_string(), ip.to_string());
-                                break; // Take first IPv4 address only
+                                if let Some(ip) = addr["local"].as_str() {
+                                    ip_addresses.push(ip.to_string());
+                                }
                             }
                         }
+                    }
+
+                    if !ip_addresses.is_empty() {
+                        interfaces.push(InterfaceIPs {
+                            interface: name.to_string(),
+                            ip_addresses,
+                        });
                     }
                 }
             }
         }
 
-        Ok(addresses)
+        Ok(interfaces)
+    }
+
+    /// Gets system UUID and serial from dmidecode
+    fn get_system_info() -> Result<SystemInfo, Box<dyn Error>> {
+        let output = match Command::new("dmidecode").args(&["-t", "system"]).output() {
+            Ok(out) => {
+                if !out.status.success() {
+                    Command::new("sudo")
+                        .args(&["dmidecode", "-t", "system"])
+                        .output()?
+                } else {
+                    out
+                }
+            }
+            Err(_) => Command::new("sudo")
+                .args(&["dmidecode", "-t", "system"])
+                .output()?,
+        };
+
+        let stdout = String::from_utf8_lossy(&output.stdout);
+
+        if !output.status.success() || stdout.trim().is_empty() {
+            return Ok(SystemInfo {
+                uuid: "Unknown".to_string(),
+                serial: "Unknown".to_string(),
+                product_name: "Unknown".to_string(),
+                product_manufacturer: "Unknown".to_string(),
+            });
+        }
+
+        let uuid = Self::extract_dmidecode_value(&stdout, "UUID")
+            .unwrap_or_else(|_| "Unknown".to_string());
+        let serial = Self::extract_dmidecode_value(&stdout, "Serial Number")
+            .unwrap_or_else(|_| "Unknown".to_string());
+        let product_name = Self::extract_dmidecode_value(&stdout, "Product Name")
+            .unwrap_or_else(|_| "Unknown".to_string());
+        let product_manufacturer = Self::extract_dmidecode_value(&stdout, "Manufacturer")
+            .unwrap_or_else(|_| "Unknown".to_string());
+
+        Ok(SystemInfo {
+            uuid,
+            serial,
+            product_name,
+            product_manufacturer,
+        })
     }
 
     /// Collects all server information
@@ -663,10 +739,11 @@ impl ServerInfo {
         let hostname = Self::get_hostname()?;
         let hardware = Self::collect_hardware_info()?;
         let network = Self::collect_network_info()?;
+        let system_info = Self::get_system_info()?;
         let (bmc_ip, bmc_mac) = Self::collect_ipmi_info()?;
         let os_ip = Self::collect_ip_addresses()?;
 
-        let summary = Self::generate_summary(&hardware, &network)?;
+        let summary = Self::generate_summary(&hardware, &network, &system_info)?;
 
         Ok(ServerInfo {
             summary,
@@ -693,10 +770,10 @@ impl ServerInfo {
     /// Calculates total storage capacity
     fn calculate_total_storage(storage: &StorageInfo) -> Result<String, Box<dyn Error>> {
         let mut total_bytes: u64 = 0;
+        let re = Regex::new(r"(\d+(?:\.\d+)?)(B|K|M|G|T)")?;
 
         for device in &storage.devices {
             let size_str = device.size.replace(" ", "");
-            let re = Regex::new(r"(\d+(?:\.\d+)?)(B|K|M|G|T)")?;
 
             if let Some(caps) = re.captures(&size_str) {
                 let value: f64 = caps[1].parse()?;
@@ -910,6 +987,7 @@ impl ServerInfo {
     fn generate_summary(
         hardware: &HardwareInfo,
         network: &NetworkInfo,
+        system_info: &SystemInfo,
     ) -> Result<SystemSummary, Box<dyn Error>> {
         let bios = Self::get_bios_info().unwrap_or_else(|_| BiosInfo {
             vendor: "Unknown Vendor".to_string(),
@@ -960,6 +1038,12 @@ impl ServerInfo {
         let total_storage_tb = Self::calculate_total_storage_tb(&hardware.storage)?;
 
         Ok(SystemSummary {
+            system_info: SystemInfo {
+                uuid: system_info.uuid.clone(),
+                serial: system_info.serial.clone(),
+                product_name: system_info.product_name.clone(),
+                product_manufacturer: system_info.product_manufacturer.clone(),
+            },
             total_memory: hardware.memory.total.clone(),
             memory_config: format!("{} @ {}", hardware.memory.type_, hardware.memory.speed),
             total_storage_tb,
@@ -1224,12 +1308,9 @@ impl ServerInfo {
                     let speed = match Command::new("ethtool").arg(name).output() {
                         Ok(output) => {
                             let output_str = String::from_utf8(output.stdout)?;
-                            let re_speed = Regex::new(r"Speed:\s+(\S+)")?;
-                            if let Some(cap) = re_speed.captures(&output_str) {
-                                Some(cap[1].to_string())
-                            } else {
-                                None
-                            }
+                            NETWORK_SPEED_RE
+                                .captures(&output_str)
+                                .map(|cap| cap[1].to_string())
                         }
                         Err(_) => None,
                     };
