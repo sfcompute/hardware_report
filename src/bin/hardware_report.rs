@@ -78,6 +78,10 @@ struct Opt {
     /// Skip TLS certificate verification (not recommended for production use)
     #[structopt(long)]
     skip_tls_verify: bool,
+
+    /// No summary output to console
+    #[structopt(long)]
+    noout: bool,
 }
 
 fn parse_label(s: &str) -> Result<(String, String), String> {
@@ -96,135 +100,138 @@ async fn main() -> Result<(), Box<dyn Error>> {
     // Collect server information
     let server_info = ServerInfo::collect()?;
 
-    // Generate summary output for console
-    println!("System Summary:");
-    println!("==============");
-    println!("Hostname: {}", server_info.hostname);
-    println!("System UUID: {}", server_info.summary.system_info.uuid);
-    println!("System Serial: {}", server_info.summary.system_info.serial);
-    println!("CPU: {}", server_info.summary.cpu_summary);
-    println!(
-        "Total: {} Cores, {} Threads",
-        server_info.summary.cpu_topology.total_cores,
-        server_info.summary.cpu_topology.total_threads
-    );
-
-    // Fix memory output format - add the missing format specifier
-    println!(
-        "Memory: {} {} @ {}",
-        server_info.hardware.memory.total,
-        server_info.hardware.memory.type_,
-        server_info.hardware.memory.speed
-    );
-
-    println!(
-        "Storage: {} (Total: {:.2} TB)",
-        server_info.summary.total_storage, server_info.summary.total_storage_tb
-    );
-
-    // Calculate total storage
-    let total_storage = server_info
-        .hardware
-        .storage
-        .devices
-        .iter()
-        .map(|device| device.size.clone())
-        .collect::<Vec<String>>()
-        .join(" + ");
-    println!("Available Disks: {}", total_storage);
-
-    // Get BIOS information from dmidecode
-    let output = Command::new("dmidecode").args(["-t", "bios"]).output()?;
-    let bios_str = String::from_utf8(output.stdout)?;
-    println!(
-        "BIOS: {} {} ({})",
-        ServerInfo::extract_dmidecode_value(&bios_str, "Vendor")?,
-        ServerInfo::extract_dmidecode_value(&bios_str, "Version")?,
-        ServerInfo::extract_dmidecode_value(&bios_str, "Release Date")?
-    );
-
-    // Get chassis information from dmidecode
-    let output = Command::new("dmidecode").args(["-t", "chassis"]).output()?;
-    let chassis_str = String::from_utf8(output.stdout)?;
-    println!(
-        "Chassis: {} {} (S/N: {})",
-        ServerInfo::extract_dmidecode_value(&chassis_str, "Manufacturer")?,
-        ServerInfo::extract_dmidecode_value(&chassis_str, "Type")?,
-        ServerInfo::extract_dmidecode_value(&chassis_str, "Serial Number")?
-    );
-
-    // Get motherboard information from server_info
-    println!(
-        "Motherboard: {} {} v{} (S/N: {})",
-        server_info.summary.motherboard.manufacturer,
-        server_info.summary.motherboard.product_name,
-        server_info.summary.motherboard.version,
-        server_info.summary.motherboard.serial
-    );
-
-    println!("\nNetwork Interfaces:");
-    for nic in &server_info.network.interfaces {
+    // Generate summary output for console only if no_summary is false
+    if !opt.noout {
+        println!("System Summary:");
+        println!("==============");
+        println!("Hostname: {}", server_info.hostname);
+        println!("FQDN: {}", server_info.fqdn);
+        println!("System UUID: {}", server_info.summary.system_info.uuid);
+        println!("System Serial: {}", server_info.summary.system_info.serial);
+        println!("CPU: {}", server_info.summary.cpu_summary);
         println!(
-            "  {} - {} {} ({}) [Speed: {}] [NUMA: {}]",
-            nic.name,
-            nic.vendor,
-            nic.model,
-            nic.pci_id,
-            nic.speed.as_deref().unwrap_or("Unknown"),
-            nic.numa_node
-                .map_or("Unknown".to_string(), |n| n.to_string())
+            "Total: {} Cores, {} Threads",
+            server_info.summary.cpu_topology.total_cores,
+            server_info.summary.cpu_topology.total_threads
         );
-    }
 
-    println!("\nGPUs:");
-    for gpu in &server_info.hardware.gpus.devices {
+        // Fix memory output format - add the missing format specifier
         println!(
-            "  {} - {} ({}) [NUMA: {}]",
-            gpu.name,
-            gpu.vendor,
-            gpu.pci_id,
-            gpu.numa_node
-                .map_or("Unknown".to_string(), |n| n.to_string())
+            "Memory: {} {} @ {}",
+            server_info.hardware.memory.total,
+            server_info.hardware.memory.type_,
+            server_info.hardware.memory.speed
         );
-    }
 
-    println!("\nNUMA Topology:");
-    for (node_id, node) in &server_info.summary.numa_topology {
-        println!("  Node {}:", node_id);
-        println!("    Memory: {}", node.memory);
-        println!("    CPUs: {:?}", node.cpus);
+        println!(
+            "Storage: {} (Total: {:.2} TB)",
+            server_info.summary.total_storage, server_info.summary.total_storage_tb
+        );
 
-        if !node.devices.is_empty() {
-            println!("    Devices:");
-            for device in &node.devices {
-                println!(
-                    "      {} - {} (PCI ID: {})",
-                    device.type_, device.name, device.pci_id
-                );
+        // Calculate total storage
+        let total_storage = server_info
+            .hardware
+            .storage
+            .devices
+            .iter()
+            .map(|device| device.size.clone())
+            .collect::<Vec<String>>()
+            .join(" + ");
+        println!("Available Disks: {}", total_storage);
+
+        // Get BIOS information from dmidecode
+        let output = Command::new("dmidecode").args(["-t", "bios"]).output()?;
+        let bios_str = String::from_utf8(output.stdout)?;
+        println!(
+            "BIOS: {} {} ({})",
+            ServerInfo::extract_dmidecode_value(&bios_str, "Vendor")?,
+            ServerInfo::extract_dmidecode_value(&bios_str, "Version")?,
+            ServerInfo::extract_dmidecode_value(&bios_str, "Release Date")?
+        );
+
+        // Get chassis information from dmidecode
+        let output = Command::new("dmidecode").args(["-t", "chassis"]).output()?;
+        let chassis_str = String::from_utf8(output.stdout)?;
+        println!(
+            "Chassis: {} {} (S/N: {})",
+            ServerInfo::extract_dmidecode_value(&chassis_str, "Manufacturer")?,
+            ServerInfo::extract_dmidecode_value(&chassis_str, "Type")?,
+            ServerInfo::extract_dmidecode_value(&chassis_str, "Serial Number")?
+        );
+
+        // Get motherboard information from server_info
+        println!(
+            "Motherboard: {} {} v{} (S/N: {})",
+            server_info.summary.motherboard.manufacturer,
+            server_info.summary.motherboard.product_name,
+            server_info.summary.motherboard.version,
+            server_info.summary.motherboard.serial
+        );
+
+        println!("\nNetwork Interfaces:");
+        for nic in &server_info.network.interfaces {
+            println!(
+                "  {} - {} {} ({}) [Speed: {}] [NUMA: {}]",
+                nic.name,
+                nic.vendor,
+                nic.model,
+                nic.pci_id,
+                nic.speed.as_deref().unwrap_or("Unknown"),
+                nic.numa_node
+                    .map_or("Unknown".to_string(), |n| n.to_string())
+            );
+        }
+
+        println!("\nGPUs:");
+        for gpu in &server_info.hardware.gpus.devices {
+            println!(
+                "  {} - {} ({}) [NUMA: {}]",
+                gpu.name,
+                gpu.vendor,
+                gpu.pci_id,
+                gpu.numa_node
+                    .map_or("Unknown".to_string(), |n| n.to_string())
+            );
+        }
+
+        println!("\nNUMA Topology:");
+        for (node_id, node) in &server_info.summary.numa_topology {
+            println!("  Node {}:", node_id);
+            println!("    Memory: {}", node.memory);
+            println!("    CPUs: {:?}", node.cpus);
+
+            if !node.devices.is_empty() {
+                println!("    Devices:");
+                for device in &node.devices {
+                    println!(
+                        "      {} - {} (PCI ID: {})",
+                        device.type_, device.name, device.pci_id
+                    );
+                }
+            }
+
+            println!("    Distances:");
+            let mut distances: Vec<_> = node.distances.iter().collect();
+            distances.sort_by_key(|&(k, _)| k);
+            for (to_node, distance) in distances {
+                println!("      To Node {}: {}", to_node, distance);
             }
         }
 
-        println!("    Distances:");
-        let mut distances: Vec<_> = node.distances.iter().collect();
-        distances.sort_by_key(|&(k, _)| k);
-        for (to_node, distance) in distances {
-            println!("      To Node {}: {}", to_node, distance);
-        }
-    }
-
-    // Get filesystem information
-    println!("\nFilesystems:");
-    let output = Command::new("df")
-        .args(["-h", "--output=source,fstype,size,used,avail,target"])
-        .output()?;
-    let fs_str = String::from_utf8(output.stdout)?;
-    for line in fs_str.lines().skip(1) {
-        let fields: Vec<&str> = line.split_whitespace().collect();
-        if fields.len() >= 6 {
-            println!(
-                "  {} ({}) - {} total, {} used, {} available, mounted on {}",
-                fields[0], fields[1], fields[2], fields[3], fields[4], fields[5]
-            );
+        // Get filesystem information
+        println!("\nFilesystems:");
+        let output = Command::new("df")
+            .args(["-h", "--output=source,fstype,size,used,avail,target"])
+            .output()?;
+        let fs_str = String::from_utf8(output.stdout)?;
+        for line in fs_str.lines().skip(1) {
+            let fields: Vec<&str> = line.split_whitespace().collect();
+            if fields.len() >= 6 {
+                println!(
+                    "  {} ({}) - {} total, {} used, {} available, mounted on {}",
+                    fields[0], fields[1], fields[2], fields[3], fields[4], fields[5]
+                );
+            }
         }
     }
 

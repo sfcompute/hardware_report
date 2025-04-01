@@ -595,7 +595,7 @@ dependencies = [
 
 [[package]]
 name = "hardware_report"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "assert_fs",
  "clap 4.5.20",

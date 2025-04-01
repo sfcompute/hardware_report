@@ -129,6 +129,7 @@ pub struct ServerInfo {
     pub summary: SystemSummary,
     /// Other fields remain the same
     pub hostname: String,
+    pub fqdn: String,
     pub os_ip: Vec<InterfaceIPs>,
     pub bmc_ip: Option<String>,
     pub bmc_mac: Option<String>,
@@ -480,6 +481,11 @@ impl ServerInfo {
 
     /// Gets hostname of the server
     fn get_hostname() -> Result<String, Box<dyn Error>> {
+        let output = Command::new("hostname").output()?;
+        Ok(String::from_utf8(output.stdout)?.trim().to_string())
+    }
+
+    fn get_fqdn() -> Result<String, Box<dyn Error>> {
         let output = Command::new("hostname").args(&["-f"]).output()?;
         Ok(String::from_utf8(output.stdout)?.trim().to_string())
     }
@@ -737,6 +743,7 @@ impl ServerInfo {
         }
 
         let hostname = Self::get_hostname()?;
+        let fqdn = Self::get_fqdn()?;
         let hardware = Self::collect_hardware_info()?;
         let network = Self::collect_network_info()?;
         let system_info = Self::get_system_info()?;
@@ -748,6 +755,7 @@ impl ServerInfo {
         Ok(ServerInfo {
             summary,
             hostname,
+            fqdn,
             os_ip,
             bmc_ip,
             bmc_mac,

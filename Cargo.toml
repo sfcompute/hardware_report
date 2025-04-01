@@ -1,6 +1,6 @@
 [package]
 name = "hardware_report"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2021"
 authors = ["Kenny Sheridan"]
 description = "A tool for generating hardware information reports"
