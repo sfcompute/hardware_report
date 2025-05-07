@@ -189,6 +189,10 @@ pub struct MemoryModule {
     pub speed: String,
     /// Physical location of the memory module.
     pub location: String,
+    /// Manufacturer of the memory module.
+    pub manufacturer: String,
+    /// Serial number of the memory module.
+    pub serial: String,
 }
 
 /// Represents storage information.
@@ -1192,12 +1196,16 @@ impl ServerInfo {
         let type_ = Self::extract_dmidecode_value(text, "Type")?;
         let speed = Self::extract_dmidecode_value(text, "Speed")?;
         let location = Self::extract_dmidecode_value(text, "Locator")?;
+        let manufacturer = Self::extract_dmidecode_value(text, "Manufacturer")?;
+        let serial = Self::extract_dmidecode_value(text, "Serial Number")?;
 
         Ok(MemoryModule {
             size,
             type_,
             speed,
             location,
+            manufacturer,
+            serial,
         })
     }
 
