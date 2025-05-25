@@ -370,44 +370,64 @@ impl ServerInfo {
                 eprintln!("{}", info);
             }
             eprintln!("\nSome hardware information may be incomplete or unavailable.");
-            
+
             // Separate packages that are typically pre-installed vs specialized tools
             let core_utils = vec!["hostname", "ip", "lscpu", "free", "df", "lsblk"];
             let specialized_tools = vec!["numactl", "lspci", "ethtool", "dmidecode"];
-            
-            let missing_core: Vec<&str> = missing_packages.iter()
+
+            let missing_core: Vec<&str> = missing_packages
+                .iter()
                 .filter(|&&pkg| core_utils.contains(&pkg))
                 .copied()
                 .collect();
-            let missing_specialized: Vec<&str> = missing_packages.iter()
+            let missing_specialized: Vec<&str> = missing_packages
+                .iter()
                 .filter(|&&pkg| specialized_tools.contains(&pkg))
                 .copied()
                 .collect();
-            
+
             if !missing_core.is_empty() {
                 eprintln!("\nCore utilities missing (usually pre-installed):");
-                eprintln!("  Ubuntu/Debian: sudo apt install {}", 
-                    missing_core.iter().map(|&pkg| match pkg {
-                        "ip" => "iproute2",
-                        "lscpu" | "lsblk" => "util-linux",
-                        "free" | "hostname" => "procps",
-                        "df" => "coreutils",
-                        _ => pkg
-                    }).collect::<Vec<_>>().join(" "));
-                eprintln!("  RHEL/Fedora: sudo dnf install {}", 
-                    missing_core.iter().map(|&pkg| match pkg {
-                        "ip" => "iproute",
-                        "lscpu" | "lsblk" => "util-linux",
-                        "free" => "procps-ng",
-                        "hostname" | "df" => "coreutils",
-                        _ => pkg
-                    }).collect::<Vec<_>>().join(" "));
+                eprintln!(
+                    "  Ubuntu/Debian: sudo apt install {}",
+                    missing_core
+                        .iter()
+                        .map(|&pkg| match pkg {
+                            "ip" => "iproute2",
+                            "lscpu" | "lsblk" => "util-linux",
+                            "free" | "hostname" => "procps",
+                            "df" => "coreutils",
+                            _ => pkg,
+                        })
+                        .collect::<Vec<_>>()
+                        .join(" ")
+                );
+                eprintln!(
+                    "  RHEL/Fedora: sudo dnf install {}",
+                    missing_core
+                        .iter()
+                        .map(|&pkg| match pkg {
+                            "ip" => "iproute",
+                            "lscpu" | "lsblk" => "util-linux",
+                            "free" => "procps-ng",
+                            "hostname" | "df" => "coreutils",
+                            _ => pkg,
+                        })
+                        .collect::<Vec<_>>()
+                        .join(" ")
+                );
             }
-            
+
             if !missing_specialized.is_empty() {
                 eprintln!("\nSpecialized tools missing:");
-                eprintln!("  Ubuntu/Debian: sudo apt install {}", missing_specialized.join(" "));
-                eprintln!("  RHEL/Fedora: sudo dnf install {}", missing_specialized.join(" "));
+                eprintln!(
+                    "  Ubuntu/Debian: sudo apt install {}",
+                    missing_specialized.join(" ")
+                );
+                eprintln!(
+                    "  RHEL/Fedora: sudo dnf install {}",
+                    missing_specialized.join(" ")
+                );
             }
             eprintln!();
         }
@@ -492,7 +512,7 @@ impl ServerInfo {
         // Check if we have sudo/root privileges
         let euid = unsafe { libc::geteuid() };
         let use_sudo = euid != 0;
-        
+
         // Detect the package manager
         let pkg_managers = vec![
             ("apt-get", vec!["update"], vec!["install", "-y", "numactl"]),
@@ -501,10 +521,15 @@ impl ServerInfo {
             ("yum", vec![], vec!["install", "-y", "numactl"]),
             ("zypper", vec!["refresh"], vec!["install", "-y", "numactl"]),
         ];
-        
+
         for (manager, update_args, install_args) in pkg_managers {
             // Check if the package manager exists
-            if Command::new("which").arg(manager).output()?.status.success() {
+            if Command::new("which")
+                .arg(manager)
+                .output()?
+                .status
+                .success()
+            {
                 // Run update command if needed
                 if !update_args.is_empty() {
                     let mut update_cmd = if use_sudo {
@@ -514,11 +539,11 @@ impl ServerInfo {
                     } else {
                         Command::new(manager)
                     };
-                    
+
                     update_cmd.args(&update_args);
                     let _ = update_cmd.output(); // Ignore update errors
                 }
-                
+
                 // Run install command
                 let mut install_cmd = if use_sudo {
                     let mut cmd = Command::new("sudo");
@@ -527,19 +552,24 @@ impl ServerInfo {
                 } else {
                     Command::new(manager)
                 };
-                
+
                 install_cmd.args(&install_args);
                 let output = install_cmd.output()?;
-                
+
                 if output.status.success() {
                     // Verify numactl was installed
-                    if Command::new("which").arg("numactl").output()?.status.success() {
+                    if Command::new("which")
+                        .arg("numactl")
+                        .output()?
+                        .status
+                        .success()
+                    {
                         return Ok(true);
                     }
                 }
             }
         }
-        
+
         Ok(false)
     }
 
@@ -547,7 +577,9 @@ impl ServerInfo {
     #[allow(dead_code)]
     fn suggest_package_installation(missing_packages: &[&str]) {
         if !missing_packages.is_empty() {
-            eprintln!("\nTo get complete hardware information, please install the missing utilities:");
+            eprintln!(
+                "\nTo get complete hardware information, please install the missing utilities:"
+            );
             eprintln!("\nFor Ubuntu/Debian:");
             eprintln!("  sudo apt install {}", missing_packages.join(" "));
             eprintln!("\nFor RHEL/Fedora:");
@@ -585,11 +617,16 @@ impl ServerInfo {
         // Run lspci with verbose output and machine-readable format
         let output = match Command::new("lspci")
             .args(&["-vmm", "-s", pci_addr])
-            .output() {
+            .output()
+        {
             Ok(output) => output,
             Err(_) => {
                 // lspci not available, return unknown values
-                return Ok(("Unknown".to_string(), "Unknown".to_string(), "Unknown".to_string()));
+                return Ok((
+                    "Unknown".to_string(),
+                    "Unknown".to_string(),
+                    "Unknown".to_string(),
+                ));
             }
         };
 
@@ -622,9 +659,7 @@ impl ServerInfo {
         }
 
         // Get vendor and device IDs using -n flag
-        let id_output = match Command::new("lspci")
-            .args(&["-n", "-s", pci_addr])
-            .output() {
+        let id_output = match Command::new("lspci").args(&["-n", "-s", pci_addr]).output() {
             Ok(output) => output,
             Err(_) => {
                 // Return early if lspci is not available
@@ -839,7 +874,7 @@ impl ServerInfo {
         // Automatically install numactl if it's missing
         if missing_packages.contains(&"numactl") {
             eprintln!("numactl is not installed. Attempting automatic installation...");
-            
+
             // Try to detect the package manager and install numactl
             if Self::auto_install_numactl()? {
                 eprintln!("Successfully installed numactl.");
@@ -936,7 +971,8 @@ impl ServerInfo {
     fn get_filesystems() -> Result<Vec<String>, Box<dyn Error>> {
         let output = match Command::new("df")
             .args(["-h", "--output=source,fstype,size,used,avail,target"])
-            .output() {
+            .output()
+        {
             Ok(output) => output,
             Err(_) => {
                 // df not available, return empty list
@@ -1390,11 +1426,14 @@ impl ServerInfo {
     fn collect_storage_info() -> Result<StorageInfo, Box<dyn Error>> {
         let output = match Command::new("lsblk")
             .args(&["-J", "-o", "NAME,TYPE,SIZE,MODEL"])
-            .output() {
+            .output()
+        {
             Ok(output) => output,
             Err(_) => {
                 // lsblk not available, return empty storage info
-                return Ok(StorageInfo { devices: Vec::new() });
+                return Ok(StorageInfo {
+                    devices: Vec::new(),
+                });
             }
         };
 
@@ -1513,17 +1552,20 @@ impl ServerInfo {
                     }
 
                     // Get speed using ethtool if available
-                    let speed = Command::new("ethtool")
-                        .arg(name)
-                        .output()
-                        .ok()
-                        .and_then(|output| {
-                            String::from_utf8(output.stdout).ok().and_then(|output_str| {
-                                NETWORK_SPEED_RE
-                                    .captures(&output_str)
-                                    .map(|cap| cap[1].to_string())
-                            })
-                        });
+                    let speed =
+                        Command::new("ethtool")
+                            .arg(name)
+                            .output()
+                            .ok()
+                            .and_then(|output| {
+                                String::from_utf8(output.stdout)
+                                    .ok()
+                                    .and_then(|output_str| {
+                                        NETWORK_SPEED_RE
+                                            .captures(&output_str)
+                                            .map(|cap| cap[1].to_string())
+                                    })
+                            });
 
                     interfaces.push(NetworkInterface {
                         name: name.to_string(),
