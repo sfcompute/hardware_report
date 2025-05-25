@@ -372,8 +372,8 @@ impl ServerInfo {
             eprintln!("\nSome hardware information may be incomplete or unavailable.");
 
             // Separate packages that are typically pre-installed vs specialized tools
-            let core_utils = vec!["hostname", "ip", "lscpu", "free", "df", "lsblk"];
-            let specialized_tools = vec!["numactl", "lspci", "ethtool", "dmidecode"];
+            let core_utils = ["hostname", "ip", "lscpu", "free", "df", "lsblk"];
+            let specialized_tools = ["numactl", "lspci", "ethtool", "dmidecode"];
 
             let missing_core: Vec<&str> = missing_packages
                 .iter()
