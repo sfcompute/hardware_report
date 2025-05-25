@@ -342,6 +342,12 @@ impl ServerInfo {
             ("lspci", "PCI device information"),
             ("ethtool", "Network interface information"),
             ("dmidecode", "System hardware information"),
+            ("lscpu", "CPU information"),
+            ("ip", "Network interface details"),
+            ("lsblk", "Storage device information"),
+            ("hostname", "System hostname"),
+            ("free", "Memory usage information"),
+            ("df", "Filesystem information"),
         ];
 
         let mut missing_packages = Vec::new();
@@ -358,14 +364,52 @@ impl ServerInfo {
         }
 
         if !missing_packages.is_empty() {
-            eprintln!("\nWarning: Some optional system utilities are not installed.");
+            eprintln!("\nWarning: Some system utilities are not installed.");
             eprintln!("Missing utilities:");
             for info in &missing_info {
                 eprintln!("{}", info);
             }
             eprintln!("\nSome hardware information may be incomplete or unavailable.");
-            eprintln!("To install missing utilities on Ubuntu/Debian: sudo apt install {}", missing_packages.join(" "));
-            eprintln!("To install missing utilities on RHEL/Fedora: sudo dnf install {}\n", missing_packages.join(" "));
+            
+            // Separate packages that are typically pre-installed vs specialized tools
+            let core_utils = vec!["hostname", "ip", "lscpu", "free", "df", "lsblk"];
+            let specialized_tools = vec!["numactl", "lspci", "ethtool", "dmidecode"];
+            
+            let missing_core: Vec<&str> = missing_packages.iter()
+                .filter(|&&pkg| core_utils.contains(&pkg))
+                .copied()
+                .collect();
+            let missing_specialized: Vec<&str> = missing_packages.iter()
+                .filter(|&&pkg| specialized_tools.contains(&pkg))
+                .copied()
+                .collect();
+            
+            if !missing_core.is_empty() {
+                eprintln!("\nCore utilities missing (usually pre-installed):");
+                eprintln!("  Ubuntu/Debian: sudo apt install {}", 
+                    missing_core.iter().map(|&pkg| match pkg {
+                        "ip" => "iproute2",
+                        "lscpu" | "lsblk" => "util-linux",
+                        "free" | "hostname" => "procps",
+                        "df" => "coreutils",
+                        _ => pkg
+                    }).collect::<Vec<_>>().join(" "));
+                eprintln!("  RHEL/Fedora: sudo dnf install {}", 
+                    missing_core.iter().map(|&pkg| match pkg {
+                        "ip" => "iproute",
+                        "lscpu" | "lsblk" => "util-linux",
+                        "free" => "procps-ng",
+                        "hostname" | "df" => "coreutils",
+                        _ => pkg
+                    }).collect::<Vec<_>>().join(" "));
+            }
+            
+            if !missing_specialized.is_empty() {
+                eprintln!("\nSpecialized tools missing:");
+                eprintln!("  Ubuntu/Debian: sudo apt install {}", missing_specialized.join(" "));
+                eprintln!("  RHEL/Fedora: sudo dnf install {}", missing_specialized.join(" "));
+            }
+            eprintln!();
         }
 
         Ok(missing_packages)
@@ -443,6 +487,62 @@ impl ServerInfo {
         }
     }
 
+    /// Automatically installs numactl if not present
+    fn auto_install_numactl() -> Result<bool, Box<dyn Error>> {
+        // Check if we have sudo/root privileges
+        let euid = unsafe { libc::geteuid() };
+        let use_sudo = euid != 0;
+        
+        // Detect the package manager
+        let pkg_managers = vec![
+            ("apt-get", vec!["update"], vec!["install", "-y", "numactl"]),
+            ("apt", vec!["update"], vec!["install", "-y", "numactl"]),
+            ("dnf", vec![], vec!["install", "-y", "numactl"]),
+            ("yum", vec![], vec!["install", "-y", "numactl"]),
+            ("zypper", vec!["refresh"], vec!["install", "-y", "numactl"]),
+        ];
+        
+        for (manager, update_args, install_args) in pkg_managers {
+            // Check if the package manager exists
+            if Command::new("which").arg(manager).output()?.status.success() {
+                // Run update command if needed
+                if !update_args.is_empty() {
+                    let mut update_cmd = if use_sudo {
+                        let mut cmd = Command::new("sudo");
+                        cmd.arg(manager);
+                        cmd
+                    } else {
+                        Command::new(manager)
+                    };
+                    
+                    update_cmd.args(&update_args);
+                    let _ = update_cmd.output(); // Ignore update errors
+                }
+                
+                // Run install command
+                let mut install_cmd = if use_sudo {
+                    let mut cmd = Command::new("sudo");
+                    cmd.arg(manager);
+                    cmd
+                } else {
+                    Command::new(manager)
+                };
+                
+                install_cmd.args(&install_args);
+                let output = install_cmd.output()?;
+                
+                if output.status.success() {
+                    // Verify numactl was installed
+                    if Command::new("which").arg("numactl").output()?.status.success() {
+                        return Ok(true);
+                    }
+                }
+            }
+        }
+        
+        Ok(false)
+    }
+
     // Remove automatic package installation
     #[allow(dead_code)]
     fn suggest_package_installation(missing_packages: &[&str]) {
@@ -457,13 +557,27 @@ impl ServerInfo {
 
     /// Gets hostname of the server
     fn get_hostname() -> Result<String, Box<dyn Error>> {
-        let output = Command::new("hostname").output()?;
-        Ok(String::from_utf8(output.stdout)?.trim().to_string())
+        match Command::new("hostname").output() {
+            Ok(output) => Ok(String::from_utf8(output.stdout)?.trim().to_string()),
+            Err(_) => {
+                // Fallback to reading /etc/hostname or use system name
+                if let Ok(contents) = std::fs::read_to_string("/etc/hostname") {
+                    Ok(contents.trim().to_string())
+                } else {
+                    Ok("unknown".to_string())
+                }
+            }
+        }
     }
 
     fn get_fqdn() -> Result<String, Box<dyn Error>> {
-        let output = Command::new("hostname").args(&["-f"]).output()?;
-        Ok(String::from_utf8(output.stdout)?.trim().to_string())
+        match Command::new("hostname").args(&["-f"]).output() {
+            Ok(output) => Ok(String::from_utf8(output.stdout)?.trim().to_string()),
+            Err(_) => {
+                // Fallback to hostname if FQDN lookup fails
+                Self::get_hostname()
+            }
+        }
     }
 
     /// Gets PCI information for a device
@@ -597,7 +711,13 @@ impl ServerInfo {
         }
 
         // Get CPU to node mapping
-        let output = Command::new("lscpu").args(&["-p=cpu,node"]).output()?;
+        let output = match Command::new("lscpu").args(&["-p=cpu,node"]).output() {
+            Ok(output) => output,
+            Err(_) => {
+                // lscpu not available, skip CPU to node mapping
+                return Ok(nodes);
+            }
+        };
 
         let output_str = String::from_utf8(output.stdout)?;
         for line in output_str.lines() {
@@ -623,7 +743,13 @@ impl ServerInfo {
     }
 
     fn collect_ip_addresses() -> Result<Vec<InterfaceIPs>, Box<dyn Error>> {
-        let output = Command::new("ip").args(&["-j", "addr"]).output()?;
+        let output = match Command::new("ip").args(&["-j", "addr"]).output() {
+            Ok(output) => output,
+            Err(_) => {
+                // ip command not available, return empty list
+                return Ok(Vec::new());
+            }
+        };
         let json: serde_json::Value = serde_json::from_slice(&output.stdout)?;
 
         let mut interfaces = Vec::new();
@@ -708,7 +834,19 @@ impl ServerInfo {
     /// Collects all server information
     pub fn collect() -> Result<Self, Box<dyn Error>> {
         // Check dependencies first and warn about missing packages
-        let _missing_packages = Self::check_dependencies()?;
+        let missing_packages = Self::check_dependencies()?;
+
+        // Automatically install numactl if it's missing
+        if missing_packages.contains(&"numactl") {
+            eprintln!("numactl is not installed. Attempting automatic installation...");
+            
+            // Try to detect the package manager and install numactl
+            if Self::auto_install_numactl()? {
+                eprintln!("Successfully installed numactl.");
+            } else {
+                eprintln!("Warning: Could not automatically install numactl. NUMA information may be incomplete.");
+            }
+        }
 
         // Check if running as root
         let euid = unsafe { libc::geteuid() };
@@ -796,9 +934,15 @@ impl ServerInfo {
 
     /// Gets filesystem information
     fn get_filesystems() -> Result<Vec<String>, Box<dyn Error>> {
-        let output = Command::new("df")
+        let output = match Command::new("df")
             .args(["-h", "--output=source,fstype,size,used,avail,target"])
-            .output()?;
+            .output() {
+            Ok(output) => output,
+            Err(_) => {
+                // df not available, return empty list
+                return Ok(Vec::new());
+            }
+        };
 
         let output_str = String::from_utf8(output.stdout)?;
         let mut filesystems = Vec::new();
@@ -920,7 +1064,21 @@ impl ServerInfo {
 
     /// Gets detailed CPU topology information
     fn get_cpu_topology() -> Result<CpuTopology, Box<dyn Error>> {
-        let output = Command::new("lscpu").args(&["-J"]).output()?;
+        let output = match Command::new("lscpu").args(&["-J"]).output() {
+            Ok(output) => output,
+            Err(_) => {
+                // lscpu not available, return default topology
+                return Ok(CpuTopology {
+                    total_cores: 0,
+                    total_threads: 0,
+                    sockets: 0,
+                    cores_per_socket: 0,
+                    threads_per_core: 0,
+                    numa_nodes: 0,
+                    cpu_model: "Unknown".to_string(),
+                });
+            }
+        };
 
         let json: serde_json::Value = serde_json::from_slice(&output.stdout)?;
         let mut info_map = HashMap::new();
@@ -1062,7 +1220,19 @@ impl ServerInfo {
     /// Collects CPU information by parsing 'lscpu' output.
     fn collect_cpu_info() -> Result<CpuInfo, Box<dyn Error>> {
         // Use 'lscpu -J' for JSON output to ensure reliable parsing.
-        let output = Command::new("lscpu").args(&["-J"]).output()?;
+        let output = match Command::new("lscpu").args(&["-J"]).output() {
+            Ok(output) => output,
+            Err(_) => {
+                // lscpu not available, return basic CPU info
+                return Ok(CpuInfo {
+                    model: "Unknown".to_string(),
+                    cores: 0,
+                    threads: 0,
+                    sockets: 0,
+                    speed: "Unknown".to_string(),
+                });
+            }
+        };
         let json: serde_json::Value = serde_json::from_slice(&output.stdout)?;
 
         // Build a map of lscpu key-value pairs.
@@ -1163,7 +1333,25 @@ impl ServerInfo {
 
     /// Retrieves the total memory size using 'free -h'.
     fn get_total_memory() -> Result<String, Box<dyn Error>> {
-        let output = Command::new("free").arg("-h").output()?;
+        let output = match Command::new("free").arg("-h").output() {
+            Ok(output) => output,
+            Err(_) => {
+                // free command not available, try reading from /proc/meminfo
+                if let Ok(contents) = std::fs::read_to_string("/proc/meminfo") {
+                    for line in contents.lines() {
+                        if line.starts_with("MemTotal:") {
+                            let parts: Vec<&str> = line.split_whitespace().collect();
+                            if parts.len() >= 2 {
+                                let kb: u64 = parts[1].parse().unwrap_or(0);
+                                let gb = kb as f64 / 1024.0 / 1024.0;
+                                return Ok(format!("{:.1}G", gb));
+                            }
+                        }
+                    }
+                }
+                return Ok("Unknown".to_string());
+            }
+        };
         let output_str = String::from_utf8(output.stdout)?;
         let re = Regex::new(r"Mem:\s+(\S+)")?;
 
@@ -1200,9 +1388,15 @@ impl ServerInfo {
 
     /// Collects storage information by parsing 'lsblk' output.
     fn collect_storage_info() -> Result<StorageInfo, Box<dyn Error>> {
-        let output = Command::new("lsblk")
+        let output = match Command::new("lsblk")
             .args(&["-J", "-o", "NAME,TYPE,SIZE,MODEL"])
-            .output()?;
+            .output() {
+            Ok(output) => output,
+            Err(_) => {
+                // lsblk not available, return empty storage info
+                return Ok(StorageInfo { devices: Vec::new() });
+            }
+        };
 
         let json: serde_json::Value = serde_json::from_slice(&output.stdout)?;
         let mut devices = Vec::new();
@@ -1266,7 +1460,16 @@ impl ServerInfo {
     /// Collects network information, including Infiniband if available.
     fn collect_network_info() -> Result<NetworkInfo, Box<dyn Error>> {
         let mut interfaces = Vec::new();
-        let output = Command::new("ip").args(&["-j", "addr", "show"]).output()?;
+        let output = match Command::new("ip").args(&["-j", "addr", "show"]).output() {
+            Ok(output) => output,
+            Err(_) => {
+                // ip command not available, return empty network info
+                return Ok(NetworkInfo {
+                    interfaces: Vec::new(),
+                    infiniband: None,
+                });
+            }
+        };
         let json: serde_json::Value = serde_json::from_slice(&output.stdout)?;
 
         if let Some(ifaces) = json.as_array() {
