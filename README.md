@@ -1,5 +1,5 @@
 # Hardware Report
-A Rust utility that automatically collects and reports detailed hardware information from Linux servers, outputting the data in TOML format.
+A Rust utility that automatically collects and reports detailed hardware information from Linux servers, outputting the data in TOML or JSON format. It can be used both as a command-line tool and as a library in other Rust programs.
 
 The collected data is saved as `<chassis_serialnumber>_hardware_report.toml`, which ensures scalability by creating distinct reports for each server. These reports are useful for infrastructure standardization across heterogeneous bare-metal hardware, allowing operators to automate and manage configurations consistently.
 
@@ -17,6 +17,40 @@ cargo build --release
 # The binary will be available at:
 target/release/hardware_report
 ```
+
+### Use as a Library
+Add `hardware_report` to your `Cargo.toml`:
+
+```toml
+[dependencies]
+hardware_report = { path = "path/to/hardware_report" }
+# or from a git repository:
+# hardware_report = { git = "https://github.com/sfcompute/hardware_report" }
+```
+
+Basic usage in your Rust code:
+
+```rust
+use hardware_report::ServerInfo;
+
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    // Collect hardware information
+    let server_info = ServerInfo::collect()?;
+    
+    // Access the data
+    println!("Hostname: {}", server_info.hostname);
+    println!("Total Memory: {}", server_info.summary.total_memory);
+    println!("CPU: {}", server_info.summary.cpu_summary);
+    
+    // Serialize to JSON or TOML
+    let json = serde_json::to_string_pretty(&server_info)?;
+    let toml = toml::to_string_pretty(&server_info)?;
+    
+    Ok(())
+}
+```
+
+See the `examples/` directory for more detailed usage examples.
 
 ## ⚠️ IMPORTANT BUILD REQUIREMENT ⚠️
 **DOCKER MUST BE RUNNING ON YOUR LOCAL MACHINE TO COMPILE FOR LINUX ON NON-LINUX SYSTEMS**
@@ -124,6 +158,56 @@ sha256sum -c hardware_report-linux-x86_64-*.tar.gz.sha256
 # Extract and make executable
 tar xzf hardware_report-linux-x86_64-*.tar.gz
 chmod +x hardware_report-linux-x86_64
+```
+
+## Library API
+
+When using `hardware_report` as a library, the main entry point is the `ServerInfo` struct and its `collect()` method. Here are the key types available:
+
+### Main Types
+- `ServerInfo` - The main struct containing all hardware information
+- `SystemSummary` - High-level system overview
+- `HardwareInfo` - Detailed hardware specifications
+- `NetworkInfo` - Network interface details
+- `posting::post_data()` - Function to POST data to a remote endpoint
+
+### Example: Filtering by NUMA Node
+```rust
+use hardware_report::ServerInfo;
+
+let info = ServerInfo::collect()?;
+
+// Find all GPUs on NUMA node 0
+let gpus_on_node_0: Vec<_> = info.hardware.gpus.devices.iter()
+    .filter(|gpu| gpu.numa_node == Some(0))
+    .collect();
+
+// Find all network interfaces on NUMA node 1
+let nics_on_node_1: Vec<_> = info.network.interfaces.iter()
+    .filter(|nic| nic.numa_node == Some(1))
+    .collect();
+```
+
+### Example: Custom Serialization
+```rust
+use hardware_report::{ServerInfo, posting::PostPayload};
+use std::collections::HashMap;
+
+let info = ServerInfo::collect()?;
+
+// Create a custom payload with labels
+let mut labels = HashMap::new();
+labels.insert("datacenter".to_string(), "us-west-2".to_string());
+labels.insert("rack".to_string(), "A42".to_string());
+
+let payload = PostPayload {
+    labels,
+    result: info,
+};
+
+// Save to custom format
+let json = serde_json::to_string_pretty(&payload)?;
+std::fs::write("custom_report.json", json)?;
 ```
 
 ## Usage
