@@ -345,6 +345,7 @@ impl ServerInfo {
         ];
 
         let mut missing_packages = Vec::new();
+        let mut missing_info = Vec::new();
 
         // Check which packages are missing
         for (package, purpose) in &required_packages {
@@ -352,12 +353,19 @@ impl ServerInfo {
 
             if !status.status.success() {
                 missing_packages.push(*package);
-                eprintln!("Missing {}: required for {}", package, purpose);
+                missing_info.push(format!("  - {}: {}", package, purpose));
             }
         }
 
         if !missing_packages.is_empty() {
-            Self::install_missing_packages()?;
+            eprintln!("\nWarning: Some optional system utilities are not installed.");
+            eprintln!("Missing utilities:");
+            for info in &missing_info {
+                eprintln!("{}", info);
+            }
+            eprintln!("\nSome hardware information may be incomplete or unavailable.");
+            eprintln!("To install missing utilities on Ubuntu/Debian: sudo apt install {}", missing_packages.join(" "));
+            eprintln!("To install missing utilities on RHEL/Fedora: sudo dnf install {}\n", missing_packages.join(" "));
         }
 
         Ok(missing_packages)
@@ -435,52 +443,16 @@ impl ServerInfo {
         }
     }
 
-    fn install_missing_packages() -> Result<(), Box<dyn Error>> {
-        let required_packages = vec![
-            ("numactl", "NUMA topology information"),
-            ("lspci", "PCI device information"),
-            ("ethtool", "Network interface information"),
-            ("dmidecode", "System hardware information"),
-        ];
-
-        let mut missing_packages = Vec::new();
-
-        // Check which packages are missing
-        for (package, purpose) in &required_packages {
-            let status = Command::new("which").arg(package).output()?;
-
-            if !status.status.success() {
-                missing_packages.push(*package);
-                eprintln!("Missing {}: required for {}", package, purpose);
-            }
-        }
-
+    // Remove automatic package installation
+    #[allow(dead_code)]
+    fn suggest_package_installation(missing_packages: &[&str]) {
         if !missing_packages.is_empty() {
-            eprintln!("\nSome required packages are missing. Attempting to install them...");
-
-            // Detect package manager
-            let mut package_manager = "apt-get";
-            let status = Command::new("which").arg("dnf").output();
-            if let Ok(output) = status {
-                if output.status.success() {
-                    package_manager = "dnf";
-                }
-            }
-
-            // Install missing packages
-            let install_command = Command::new("sudo")
-                .arg(package_manager)
-                .arg("install")
-                .arg("-y")
-                .args(&missing_packages)
-                .status()?;
-
-            if !install_command.success() {
-                return Err("Failed to install required system packages. Please install them manually and try again.".into());
-            }
+            eprintln!("\nTo get complete hardware information, please install the missing utilities:");
+            eprintln!("\nFor Ubuntu/Debian:");
+            eprintln!("  sudo apt install {}", missing_packages.join(" "));
+            eprintln!("\nFor RHEL/Fedora:");
+            eprintln!("  sudo dnf install {}", missing_packages.join(" "));
         }
-
-        Ok(())
     }
 
     /// Gets hostname of the server
@@ -497,9 +469,15 @@ impl ServerInfo {
     /// Gets PCI information for a device
     fn get_pci_info(pci_addr: &str) -> Result<(String, String, String), Box<dyn Error>> {
         // Run lspci with verbose output and machine-readable format
-        let output = Command::new("lspci")
+        let output = match Command::new("lspci")
             .args(&["-vmm", "-s", pci_addr])
-            .output()?;
+            .output() {
+            Ok(output) => output,
+            Err(_) => {
+                // lspci not available, return unknown values
+                return Ok(("Unknown".to_string(), "Unknown".to_string(), "Unknown".to_string()));
+            }
+        };
 
         let output_str = String::from_utf8(output.stdout)?;
         let mut vendor = String::new();
@@ -530,9 +508,15 @@ impl ServerInfo {
         }
 
         // Get vendor and device IDs using -n flag
-        let id_output = Command::new("lspci")
+        let id_output = match Command::new("lspci")
             .args(&["-n", "-s", pci_addr])
-            .output()?;
+            .output() {
+            Ok(output) => output,
+            Err(_) => {
+                // Return early if lspci is not available
+                return Ok((vendor, device, "Unknown".to_string()));
+            }
+        };
 
         let id_str = String::from_utf8(id_output.stdout)?;
         if let Some(line) = id_str.lines().next() {
@@ -723,15 +707,8 @@ impl ServerInfo {
 
     /// Collects all server information
     pub fn collect() -> Result<Self, Box<dyn Error>> {
-        // Check dependencies first
-        let missing_packages = Self::check_dependencies()?;
-
-        // If any essential packages are missing, return an error
-        if !missing_packages.is_empty() {
-            return Err(
-                "Missing required system packages. Please install them and try again.".into(),
-            );
-        }
+        // Check dependencies first and warn about missing packages
+        let _missing_packages = Self::check_dependencies()?;
 
         // Check if running as root
         let euid = unsafe { libc::geteuid() };
@@ -1127,7 +1104,19 @@ impl ServerInfo {
 
     /// Collects memory information by parsing 'dmidecode' output.
     fn collect_memory_info() -> Result<MemoryInfo, Box<dyn Error>> {
-        let output = Command::new("dmidecode").args(&["-t", "memory"]).output()?;
+        let output = match Command::new("dmidecode").args(&["-t", "memory"]).output() {
+            Ok(output) => output,
+            Err(_) => {
+                // dmidecode not available, try to get basic info from /proc/meminfo
+                let total = Self::get_total_memory()?;
+                return Ok(MemoryInfo {
+                    total,
+                    type_: "Unknown".to_string(),
+                    speed: "Unknown".to_string(),
+                    modules: Vec::new(),
+                });
+            }
+        };
         let output_str = String::from_utf8(output.stdout)?;
 
         // Parse dmidecode output for detailed memory information.
@@ -1320,16 +1309,18 @@ impl ServerInfo {
                         }
                     }
 
-                    // Get speed using ethtool
-                    let speed = match Command::new("ethtool").arg(name).output() {
-                        Ok(output) => {
-                            let output_str = String::from_utf8(output.stdout)?;
-                            NETWORK_SPEED_RE
-                                .captures(&output_str)
-                                .map(|cap| cap[1].to_string())
-                        }
-                        Err(_) => None,
-                    };
+                    // Get speed using ethtool if available
+                    let speed = Command::new("ethtool")
+                        .arg(name)
+                        .output()
+                        .ok()
+                        .and_then(|output| {
+                            String::from_utf8(output.stdout).ok().and_then(|output_str| {
+                                NETWORK_SPEED_RE
+                                    .captures(&output_str)
+                                    .map(|cap| cap[1].to_string())
+                            })
+                        });
 
                     interfaces.push(NetworkInterface {
                         name: name.to_string(),
