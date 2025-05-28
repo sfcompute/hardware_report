@@ -114,3 +114,89 @@ jobs:
           asset_path: build/release/hardware_report-linux-x86_64-${{ needs.create-release.outputs.version }}.tar.gz.sha256
           asset_name: hardware_report-linux-x86_64-${{ needs.create-release.outputs.version }}.tar.gz.sha256
           asset_content_type: text/plain
+
+  build-debian:
+    needs: create-release
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential \
+            curl \
+            pkg-config \
+            libssl-dev \
+            dpkg-dev \
+            debhelper
+
+      - name: Install Rust toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          override: true
+
+      - name: Build release binary
+        run: cargo build --release
+
+      - name: Create Debian package structure
+        run: |
+          VERSION=${{ needs.create-release.outputs.version }}
+          mkdir -p debian-pkg/hardware-report_${VERSION}_amd64/{DEBIAN,usr/bin,usr/share/doc/hardware-report}
+          
+          # Copy binary
+          cp target/release/hardware_report debian-pkg/hardware-report_${VERSION}_amd64/usr/bin/
+          
+          # Create control file
+          cat > debian-pkg/hardware-report_${VERSION}_amd64/DEBIAN/control << EOF
+          Package: hardware-report
+          Version: ${VERSION}
+          Architecture: amd64
+          Maintainer: Kenny Sheridan <kenny@sfcompute.com>
+          Description: Hardware information collection tool
+           A tool for generating detailed hardware information reports from Linux servers,
+           outputting the data in TOML format for infrastructure standardization.
+          Depends: numactl, ipmitool, ethtool, util-linux, pciutils
+          Priority: optional
+          Section: utils
+          EOF
+          
+          # Create copyright file
+          cat > debian-pkg/hardware-report_${VERSION}_amd64/usr/share/doc/hardware-report/copyright << EOF
+          Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
+          Upstream-Name: hardware_report
+          Source: https://github.com/sfcompute/hardware_report
+          
+          Files: *
+          Copyright: 2024 Kenny Sheridan
+          License: MIT
+          EOF
+          
+          # Build the package
+          dpkg-deb --build debian-pkg/hardware-report_${VERSION}_amd64
+          mv debian-pkg/hardware-report_${VERSION}_amd64.deb .
+          
+          # Generate checksum
+          sha256sum hardware-report_${VERSION}_amd64.deb > hardware-report_${VERSION}_amd64.deb.sha256
+
+      - name: Upload Debian package
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ needs.create-release.outputs.upload_url }}
+          asset_path: hardware-report_${{ needs.create-release.outputs.version }}_amd64.deb
+          asset_name: hardware-report_${{ needs.create-release.outputs.version }}_amd64.deb
+          asset_content_type: application/vnd.debian.binary-package
+
+      - name: Upload Debian package checksum
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ needs.create-release.outputs.upload_url }}
+          asset_path: hardware-report_${{ needs.create-release.outputs.version }}_amd64.deb.sha256
+          asset_name: hardware-report_${{ needs.create-release.outputs.version }}_amd64.deb.sha256
+          asset_content_type: text/plain
