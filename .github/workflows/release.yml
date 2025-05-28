@@ -58,35 +58,24 @@ jobs:
             dmidecode \
             ipmitool \
             pkg-config \
-            libssl-dev \
-            musl-tools  \
-            musl-dev \
-            libssl-dev:amd64
+            libssl-dev
 
       - name: Install Rust toolchain
         uses: actions-rs/toolchain@v1
         with:
           toolchain: stable
           override: true
-          # Add the musl target
-          target: x86_64-unknown-linux-musl
+          target: x86_64-unknown-linux-gnu
 
-      - name: Set environment variables for musl
+      - name: Build Release Binary
         run: |
-          echo "OPENSSL_DIR=/usr" >> $GITHUB_ENV
-          echo "PKG_CONFIG_ALLOW_CROSS=1" >> $GITHUB_ENV
-          echo "PKG_CONFIG_PATH=/usr/lib/x86_64-linux-gnu/pkgconfig" >> $GITHUB_ENV
-          echo "PKG_CONFIG_SYSROOT_DIR=/" >> $GITHUB_ENV
-
-      - name: Build Release Binary (musl)
-        run: |
-          cargo build --release --target x86_64-unknown-linux-musl
+          cargo build --release --target x86_64-unknown-linux-gnu
           mkdir -p build/release
 
-          # Rename the musl-based binary
-          cp target/x86_64-unknown-linux-musl/release/hardware_report build/release/hardware_report-linux-x86_64
+          # Copy the binary
+          cp target/x86_64-unknown-linux-gnu/release/hardware_report build/release/hardware_report-linux-x86_64
 
-          # Optional: 'strip' the binary to reduce size
+          # Strip the binary to reduce size
           strip build/release/hardware_report-linux-x86_64
 
       - name: Create tarball
