@@ -14,14 +14,13 @@ The easiest and most reproducible way to build `hardware_report` is using Nix, w
 # Install Nix and build in one go:
 curl --proto '=https' --tlsv1.2 -sSf -L https://install.determinate.systems/nix | sh -s -- install && \
 . /nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh && \
-git clone https://github.com/sfcompute/hardware_report.git && \
+git clone -b add-nix-build-support https://github.com/sfcompute/hardware_report.git && \
 cd hardware_report && \
-git checkout add-nix-build-support && \
 nix build && \
 echo "Build complete! Run with: sudo ./result/bin/hardware_report"
 ```
 
-**Note**: The Nix build support is currently in the `add-nix-build-support` branch. Once merged to main, you can skip the `git checkout` step.
+**Note**: The Nix build support is currently in the `add-nix-build-support` branch. Once merged to main, remove the `-b add-nix-build-support` flag from the clone command.
 
 ### Alternative: Use Development Shell
 For development work, enter a shell with all dependencies:
@@ -107,9 +106,8 @@ These utilities must be available on the target system:
 # One-liner for fresh systems (installs Nix, clones, and builds):
 curl --proto '=https' --tlsv1.2 -sSf -L https://install.determinate.systems/nix | sh -s -- install && \
 . /nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh && \
-git clone https://github.com/sfcompute/hardware_report.git && \
+git clone -b add-nix-build-support https://github.com/sfcompute/hardware_report.git && \
 cd hardware_report && \
-git checkout add-nix-build-support && \
 nix build
 
 # The binary will be available at:
@@ -127,10 +125,9 @@ curl --proto '=https' --tlsv1.2 -sSf -L https://install.determinate.systems/nix 
 # 2. Source Nix in current shell (no need to restart terminal)
 . /nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh
 
-# 3. Clone the repository and checkout branch with Nix support
-git clone https://github.com/sfcompute/hardware_report.git
+# 3. Clone the repository with Nix support branch
+git clone -b add-nix-build-support https://github.com/sfcompute/hardware_report.git
 cd hardware_report
-git checkout add-nix-build-support  # Remove this line once merged to main
 
 # 4. Build the project
 nix build
