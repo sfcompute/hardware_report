@@ -6,6 +6,11 @@ on:
   push:
     branches: [main]
 
+# Allow only one concurrent deployment, skipping runs queued between the run in-progress and latest queued.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 jobs:
   test:
     timeout-minutes: 45  # Increase timeout for Rust builds

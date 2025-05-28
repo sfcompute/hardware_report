@@ -6,6 +6,11 @@ on:
       - "v*.*.*"
   workflow_dispatch:
 
+# Prevent concurrent builds
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
 permissions:
   contents: write
   packages: write
@@ -74,7 +79,9 @@ jobs:
       
       - name: Build binary package
         run: |
+          echo "Starting build at $(date)"
           nix build .#default --print-build-logs
+          echo "Build completed at $(date)"
           cp -L result/bin/hardware_report hardware_report-${{ matrix.os == 'ubuntu-latest' && 'linux-x86_64' || 'darwin-x86_64' }}
       
       - name: Create tarball
