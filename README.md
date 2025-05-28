@@ -165,16 +165,29 @@ echo "Build complete! Run with: sudo ./target/release/hardware_report" && \
 sudo ./target/release/hardware_report
 ```
 
-### Option 3: Pre-built Binaries
+### Option 3: Pre-built Releases (Recommended for Quick Setup)
 
-**Download Latest Release**
+Instead of building from source, you can download pre-built binaries and Debian packages from our [GitHub Releases](https://github.com/sfcompute/hardware_report/releases) page.
+
+**Available Release Artifacts:**
+- `hardware_report-linux-x86_64-{version}.tar.gz` - Pre-compiled Linux binary
+- `hardware-report_{version}_amd64.deb` - Debian package with automatic dependency management
+- SHA256 checksums for all artifacts
+
+**Option 3a: Pre-built Binary**
 ```bash
-# Get the latest release URL
-RELEASE_URL=$(curl -s https://api.github.com/repos/sfcompute/hardware_report/releases/latest | grep "browser_download_url.*tar.gz\"" | cut -d '"' -f 4)
+# Download the latest release
+curl -s https://api.github.com/repos/sfcompute/hardware_report/releases/latest \
+  | grep "browser_download_url.*tar.gz" \
+  | cut -d '"' -f 4 \
+  | wget -i -
 
-# Download and verify
-wget $RELEASE_URL
-wget $RELEASE_URL.sha256
+# Download and verify checksum
+curl -s https://api.github.com/repos/sfcompute/hardware_report/releases/latest \
+  | grep "browser_download_url.*tar.gz.sha256" \
+  | cut -d '"' -f 4 \
+  | wget -i -
+
 sha256sum -c hardware_report-linux-x86_64-*.tar.gz.sha256
 
 # Install runtime dependencies
@@ -184,6 +197,22 @@ sudo apt-get update && sudo apt-get install -y numactl ipmitool ethtool util-lin
 tar xzf hardware_report-linux-x86_64-*.tar.gz
 chmod +x hardware_report-linux-x86_64
 sudo ./hardware_report-linux-x86_64
+```
+
+**Option 3b: Debian Package (Ubuntu/Debian)**
+```bash
+# Download the latest Debian package
+curl -s https://api.github.com/repos/sfcompute/hardware_report/releases/latest \
+  | grep "browser_download_url.*\.deb" \
+  | cut -d '"' -f 4 \
+  | wget -i -
+
+# Install with automatic dependency resolution
+sudo apt update
+sudo apt install -y ./hardware-report_*_amd64.deb
+
+# Run the tool
+sudo hardware_report
 ```
 
 ### Advanced Build Methods
@@ -314,12 +343,6 @@ The project includes GitHub Actions workflows for:
 - Code formatting and linting validation
 - Release builds triggered by version tags
 - Binary artifact generation with SHA256 checksums
-
-**Creating Releases**
-```bash
-git tag -a v1.0.0 -m "Release version 1.0.0"
-git push origin v1.0.0
-```
 
 ---
 
@@ -508,36 +531,50 @@ pci_id = "15b3:1021"
 
 ## Deployment Considerations
 
-## Deployment Considerations
-
 ### Production Deployment Options
 
-**Option 1: Debian Package (Recommended for Production)**
+**Option 1: Pre-built Debian Package (Recommended for Production)**
 ```bash
-# Using Nix-built package (includes all dependencies)
-nix build .#deb
-sudo apt install -y ./result/hardware-report_0.1.7_amd64.deb
-sudo hardware_report
+# Download latest Debian package from GitHub Releases
+curl -s https://api.github.com/repos/sfcompute/hardware_report/releases/latest \
+  | grep "browser_download_url.*\.deb" \
+  | cut -d '"' -f 4 \
+  | wget -i -
+
+# Install with automatic dependency resolution
+sudo apt update && sudo apt install -y ./hardware-report_*_amd64.deb
+
+# Deploy across multiple servers
+ansible servers -m copy -a "src=hardware-report_*_amd64.deb dest=/tmp/"
+ansible servers -m apt -a "deb=/tmp/hardware-report_*_amd64.deb state=present"
 ```
 
-**Option 2: Static Binary Deployment**
+**Option 2: Pre-built Binary Deployment**
 ```bash
-# Build static binary for maximum portability
-rustup target add x86_64-unknown-linux-musl
-cargo build --target x86_64-unknown-linux-musl --release
+# Download and verify pre-built binary
+curl -s https://api.github.com/repos/sfcompute/hardware_report/releases/latest \
+  | grep "browser_download_url.*tar.gz" \
+  | cut -d '"' -f 4 \
+  | wget -i -
 
-# Deploy to target systems (minimal dependencies required)
-scp target/x86_64-unknown-linux-musl/release/hardware_report user@target:/usr/local/bin/
-```
-
-**Option 3: Traditional Package Management**
-```bash
-# Install cargo-built binary
-sudo cp target/release/hardware_report /usr/local/bin/
-sudo chmod +x /usr/local/bin/hardware_report
+# Extract and deploy to target systems
+tar xzf hardware_report-linux-x86_64-*.tar.gz
+scp hardware_report-linux-x86_64 user@target:/usr/local/bin/hardware_report
 
 # Ensure runtime dependencies are installed on all target systems
 ansible all -m package -a "name=numactl,ipmitool,ethtool,util-linux,pciutils state=present"
+```
+
+**Option 3: Build-from-Source Deployment**
+```bash
+# For environments that require building from source
+# Using Nix-built package (includes all dependencies)
+nix build .#deb
+sudo apt install -y ./result/hardware-report_*_amd64.deb
+
+# Or using traditional cargo build
+cargo build --release
+sudo cp target/release/hardware_report /usr/local/bin/
 ```
 
 ### Automation Integration
