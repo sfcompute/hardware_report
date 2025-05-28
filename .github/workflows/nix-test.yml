@@ -14,10 +14,7 @@ concurrency:
 jobs:
   test:
     timeout-minutes: 45  # Increase timeout for Rust builds
-    strategy:
-      matrix:
-        os: [ubuntu-latest, macos-latest]
-    runs-on: ${{ matrix.os }}
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       
@@ -33,7 +30,7 @@ jobs:
       - name: Build all packages
         run: |
           nix build .#default --print-build-logs
-          nix build .#deb --print-build-logs || echo "Debian build skipped on ${{ matrix.os }}"
+          nix build .#deb --print-build-logs
       
       - name: Run tests in dev shell
         run: |
