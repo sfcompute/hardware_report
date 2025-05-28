@@ -30,6 +30,7 @@ git clone -b add-nix-build-support https://github.com/sfcompute/hardware_report.
 cd hardware_report && \
 nix build .#deb && \
 sudo apt update && \
+sudo apt --fix-broken install -y && \
 sudo apt install -y ./result/hardware-report_0.1.1_amd64.deb && \
 echo "Installed! Run with: sudo hardware_report" && \
 sudo hardware_report
@@ -156,6 +157,9 @@ nix build .#deb
 # Install the Debian package with dependencies
 sudo apt update
 sudo apt install -y ./result/hardware-report_0.1.1_amd64.deb
+
+# If you get dependency errors, fix them first:
+# sudo apt --fix-broken install -y
 ```
 
 For step-by-step instructions:
