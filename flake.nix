@@ -30,10 +30,18 @@
           darwin.apple_sdk.frameworks.Security
           darwin.apple_sdk.frameworks.SystemConfiguration
         ];
-      in
-      {
-        packages.default = pkgs.rustPlatform.buildRustPackage {
-          pname = "hardware_report";
+        
+        # Runtime dependencies that the binary needs
+        runtimeDeps = with pkgs; [
+          numactl
+          ipmitool
+          ethtool
+          util-linux  # for lscpu
+          pciutils    # for lspci
+        ];
+        
+        hardware_report_unwrapped = pkgs.rustPlatform.buildRustPackage {
+          pname = "hardware_report_unwrapped";
           version = "0.1.1";
           
           src = ./.;
@@ -51,10 +59,18 @@
             maintainers = [ ];
           };
         };
+      in
+      {
+        packages.default = pkgs.writeShellScriptBin "hardware_report" ''
+          export PATH="${pkgs.lib.makeBinPath runtimeDeps}:$PATH"
+          exec ${hardware_report_unwrapped}/bin/hardware_report "$@"
+        '';
+
+        packages.hardware_report = self.packages.${system}.default;
 
         devShells.default = pkgs.mkShell {
           inherit buildInputs;
-          nativeBuildInputs = nativeBuildInputs ++ (with pkgs; [
+          nativeBuildInputs = nativeBuildInputs ++ runtimeDeps ++ (with pkgs; [
             rustToolchain
             rust-analyzer
             cargo-watch
@@ -65,6 +81,9 @@
             echo "Hardware Report development environment"
             echo "Run 'cargo build' to build the project"
             echo "Run 'cargo run' to run the project"
+            echo ""
+            echo "Runtime dependencies are available in PATH:"
+            echo "- numactl, ipmitool, ethtool, lscpu, lspci"
           '';
         };
       });

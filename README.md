@@ -70,7 +70,7 @@ cargo build --release
 
 ### For Nix Users (Recommended)
 - Nix package manager - see installation instructions below
-- That's it! Nix handles all other dependencies
+- That's it! Nix handles ALL dependencies including runtime tools
 
 #### Installing Nix (if not already installed)
 ```bash
@@ -92,12 +92,26 @@ nix --version
 - Docker (for cross-compilation to Linux on non-Linux systems)
 
 ### Required System Utilities (Runtime)
-These utilities must be available on the target system:
-- `nvidia-smi` (required for NVIDIA GPU information)
-- `ipmitool` (required for BMC information)
-- `ethtool` (required for network interface details)
-- `numactl` (required for NUMA topology information)
-- `lscpu` (required for detailed CPU information)
+
+**When built with Nix**: All runtime dependencies are automatically included! The Nix-built binary comes with a wrapper that provides:
+- `numactl` - for NUMA topology information
+- `ipmitool` - for BMC information  
+- `ethtool` - for network interface details
+- `lscpu` - for detailed CPU information
+- `lspci` - for PCI device information
+
+**Note**: `nvidia-smi` must still be provided by your system's NVIDIA driver installation.
+
+**When built without Nix** (cargo, make, or pre-built binaries):
+```bash
+# Install required runtime dependencies on Ubuntu/Debian:
+sudo apt-get update && sudo apt-get install -y \
+  numactl \
+  ipmitool \
+  ethtool \
+  util-linux  # for lscpu
+  pciutils    # for lspci
+```
 
 ## Building
 
@@ -225,13 +239,15 @@ chmod +x hardware_report-linux-x86_64
 The program requires root privileges to access certain hardware information. Run it using sudo:
 
 ```bash
-# If built with Nix
+# If built with Nix (includes all dependencies!)
 sudo ./result/bin/hardware_report
 
-# If built with cargo
+# If built with cargo (install dependencies first)
+sudo apt-get update && sudo apt-get install -y numactl ipmitool ethtool util-linux pciutils
 sudo ./target/release/hardware_report
 
-# If using pre-built binaries
+# If using pre-built binaries (install dependencies first)
+sudo apt-get update && sudo apt-get install -y numactl ipmitool ethtool util-linux pciutils
 sudo ./hardware_report-linux-x86_64
 ```
 
