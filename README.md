@@ -22,6 +22,14 @@ echo "Build complete! Run with: sudo ./result/bin/hardware_report"
 sudo ./result/bin/hardware_report
 ```
 
+Or build and install as a Debian package:
+```bash
+# After cloning and cd into the directory
+nix build .#deb && sudo dpkg -i ./result/hardware-report_0.1.1_amd64.deb
+# Run from anywhere
+sudo hardware_report
+```
+
 **Note**: The Nix build support is currently in the `add-nix-build-support` branch. Once merged to main, remove the `-b add-nix-build-support` flag from the clone command.
 
 ### Alternative: Use Development Shell
@@ -131,6 +139,13 @@ nix build
 
 # Optional: Install system-wide
 sudo cp ./result/bin/hardware_report /usr/local/bin/
+
+# Build Debian package
+nix build .#deb
+# The .deb file will be at: ./result/hardware-report_0.1.1_amd64.deb
+
+# Install the Debian package
+sudo dpkg -i ./result/hardware-report_0.1.1_amd64.deb
 ```
 
 For step-by-step instructions:
@@ -150,6 +165,11 @@ nix build
 
 # 5. Run the binary
 sudo ./result/bin/hardware_report
+
+# 6. (Optional) Build and install Debian package
+nix build .#deb
+sudo dpkg -i ./result/hardware-report_0.1.1_amd64.deb
+# Now you can run from anywhere: sudo hardware_report
 ```
 
 ### Building with Cargo (Alternative)

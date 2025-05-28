@@ -67,6 +67,58 @@
         '';
 
         packages.hardware_report = self.packages.${system}.default;
+        
+        packages.deb = pkgs.stdenv.mkDerivation {
+          pname = "hardware-report";
+          version = "0.1.1";
+          
+          src = self.packages.${system}.default;
+          
+          nativeBuildInputs = with pkgs; [ dpkg ];
+          
+          unpackPhase = "true";
+          
+          buildPhase = ''
+            # Create debian package structure
+            mkdir -p hardware-report_0.1.1_amd64/{DEBIAN,usr/bin,usr/share/doc/hardware-report}
+            
+            # Copy the wrapped binary
+            cp ${self.packages.${system}.default}/bin/hardware_report hardware-report_0.1.1_amd64/usr/bin/
+            
+            # Create control file
+            cat > hardware-report_0.1.1_amd64/DEBIAN/control << EOF
+Package: hardware-report
+Version: 0.1.1
+Architecture: amd64
+Maintainer: Kenny Sheridan <kenny@sfcompute.com>
+Description: Hardware information collection tool
+ A tool for generating detailed hardware information reports from Linux servers,
+ outputting the data in TOML format for infrastructure standardization.
+Depends: numactl, ipmitool, ethtool, util-linux, pciutils
+Priority: optional
+Section: utils
+EOF
+            
+            # Create copyright file
+            cat > hardware-report_0.1.1_amd64/usr/share/doc/hardware-report/copyright << EOF
+Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
+Upstream-Name: hardware_report
+Source: https://github.com/sfcompute/hardware_report
+
+Files: *
+Copyright: 2024 Kenny Sheridan
+License: MIT
+EOF
+            
+            # Build the deb package
+            dpkg-deb --build hardware-report_0.1.1_amd64
+          '';
+          
+          installPhase = ''
+            mkdir -p $out
+            cp hardware-report_0.1.1_amd64.deb $out/
+          '';
+        };
 
         devShells.default = pkgs.mkShell {
           inherit buildInputs;
