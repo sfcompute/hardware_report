@@ -44,7 +44,10 @@
           pname = "hardware_report_unwrapped";
           version = "0.1.1";
           
-          src = ./.;
+          src = builtins.path { 
+            path = ./.; 
+            name = "hardware-report-source"; 
+          };
           
           cargoLock = {
             lockFile = ./Cargo.lock;

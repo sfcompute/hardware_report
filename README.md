@@ -11,22 +11,26 @@ This tool is designed to help the open-source GPU infrastructure community by pr
 The easiest and most reproducible way to build `hardware_report` is using Nix, which automatically handles all dependencies:
 
 ```bash
-# Install Nix and build in one go:
+# Install Nix, build, and run in one go:
 curl --proto '=https' --tlsv1.2 -sSf -L https://install.determinate.systems/nix | sh -s -- install && \
 . /nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh && \
 git clone -b add-nix-build-support https://github.com/sfcompute/hardware_report.git && \
 cd hardware_report && \
 nix build && \
-echo "Build complete! Run with: sudo ./result/bin/hardware_report"
-# Execute the hardware report
+echo "Build complete! Run with: sudo ./result/bin/hardware_report" && \
 sudo ./result/bin/hardware_report
 ```
 
-Or build and install as a Debian package:
+Or install as a Debian package (recommended for production):
 ```bash
-# After cloning and cd into the directory
-nix build .#deb && sudo dpkg -i ./result/hardware-report_0.1.1_amd64.deb
-# Run from anywhere
+# One-liner to install Nix, build .deb, and install system-wide:
+curl --proto '=https' --tlsv1.2 -sSf -L https://install.determinate.systems/nix | sh -s -- install && \
+. /nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh && \
+git clone -b add-nix-build-support https://github.com/sfcompute/hardware_report.git && \
+cd hardware_report && \
+nix build .#deb && \
+sudo dpkg -i ./result/hardware-report_0.1.1_amd64.deb && \
+echo "Installed! Run with: sudo hardware_report" && \
 sudo hardware_report
 ```
 
