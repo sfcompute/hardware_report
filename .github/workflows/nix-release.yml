@@ -5,6 +5,11 @@ on:
     tags:
       - "v*.*.*"
   workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version for manual builds (e.g., 0.1.11)'
+        required: false
+        default: 'dev'
 
 # Prevent concurrent builds
 concurrency:
@@ -26,7 +31,14 @@ jobs:
       
       - name: Get version from tag
         id: version
-        run: echo "version=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+        run: |
+          if [[ "${{ github.ref }}" == refs/tags/v* ]]; then
+            echo "version=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+          elif [[ "${{ github.event_name }}" == "workflow_dispatch" ]] && [[ "${{ github.event.inputs.version }}" != "dev" ]]; then
+            echo "version=${{ github.event.inputs.version }}" >> $GITHUB_OUTPUT
+          else
+            echo "version=dev-${GITHUB_SHA::8}" >> $GITHUB_OUTPUT
+          fi
 
       - name: Check if release exists
         id: check_release
@@ -122,7 +134,10 @@ jobs:
       - name: Build Debian package
         run: |
           nix build .#deb --print-build-logs
-          cp -L result/*.deb hardware-report_${{ needs.create-release.outputs.version }}_amd64.deb
+          # Find the actual deb file name
+          DEB_FILE=$(ls result/*.deb | head -n1)
+          echo "Found deb file: $DEB_FILE"
+          cp -L "$DEB_FILE" hardware-report_${{ needs.create-release.outputs.version }}_amd64.deb
       
       - name: Generate checksums
         run: |
