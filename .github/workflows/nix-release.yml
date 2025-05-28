@@ -139,33 +139,20 @@ jobs:
       
       - name: Build Docker image with Nix
         run: |
-          # Create a Docker image derivation
-          cat > docker.nix << 'EOF'
-          { pkgs ? import <nixpkgs> {} }:
-          let
-            hardware_report = (builtins.getFlake (toString ./.)).packages.${pkgs.system}.default;
-          in
-          pkgs.dockerTools.buildImage {
-            name = "hardware-report";
-            tag = "${{ needs.create-release.outputs.version }}";
-            config = {
-              Cmd = [ "${hardware_report}/bin/hardware_report" ];
-              Env = [
-                "PATH=${pkgs.lib.makeBinPath (with pkgs; [ 
-                  numactl ipmitool ethtool util-linux pciutils 
-                ])}:/usr/local/bin:/usr/bin:/bin"
-              ];
-            };
-          }
-          EOF
-          
-          nix-build docker.nix -o docker-image
-          docker load < docker-image
+          nix build .#dockerImage --print-build-logs
+          docker load < result
       
-      - name: Push to GitHub Container Registry
+      - name: Tag and Push to GitHub Container Registry
         run: |
+          # Get the image name and tag from the loaded image
+          IMAGE_ID=$(docker images --format "{{.Repository}}:{{.Tag}}" | grep "hardware-report:latest" | head -n1)
+          
           echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
-          docker tag hardware-report:${{ needs.create-release.outputs.version }} ghcr.io/${{ github.repository_owner }}/hardware-report:${{ needs.create-release.outputs.version }}
-          docker tag hardware-report:${{ needs.create-release.outputs.version }} ghcr.io/${{ github.repository_owner }}/hardware-report:latest
+          
+          # Tag for version and latest
+          docker tag $IMAGE_ID ghcr.io/${{ github.repository_owner }}/hardware-report:${{ needs.create-release.outputs.version }}
+          docker tag $IMAGE_ID ghcr.io/${{ github.repository_owner }}/hardware-report:latest
+          
+          # Push both tags
           docker push ghcr.io/${{ github.repository_owner }}/hardware-report:${{ needs.create-release.outputs.version }}
           docker push ghcr.io/${{ github.repository_owner }}/hardware-report:latest
