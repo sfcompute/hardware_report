@@ -11,18 +11,13 @@ This tool is designed to help the open-source GPU infrastructure community by pr
 The easiest and most reproducible way to build `hardware_report` is using Nix, which automatically handles all dependencies:
 
 ```bash
-# If you don't have Nix installed, install it first:
-curl --proto '=https' --tlsv1.2 -sSf -L https://install.determinate.systems/nix | sh -s -- install
-
-# Restart your terminal, then clone and build:
-git clone https://github.com/sfcompute/hardware_report.git
-cd hardware_report
-
-# Build the binary
-nix build
-
-# Run the binary
-sudo ./result/bin/hardware_report
+# Install Nix and build in one go:
+curl --proto '=https' --tlsv1.2 -sSf -L https://install.determinate.systems/nix | sh -s -- install && \
+. /nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh && \
+git clone https://github.com/sfcompute/hardware_report.git && \
+cd hardware_report && \
+nix build && \
+echo "Build complete! Run with: sudo ./result/bin/hardware_report"
 ```
 
 ### Alternative: Use Development Shell
@@ -106,24 +101,37 @@ These utilities must be available on the target system:
 
 ### Building with Nix (Recommended)
 ```bash
-# Complete copy-paste instructions for new users:
-
-# 1. Install Nix (skip if already installed)
-curl --proto '=https' --tlsv1.2 -sSf -L https://install.determinate.systems/nix | sh -s -- install
-# Restart your terminal after installation
-
-# 2. Clone the repository
-git clone https://github.com/sfcompute/hardware_report.git
-cd hardware_report
-
-# 3. Build the project
+# One-liner for fresh systems (installs Nix, clones, and builds):
+curl --proto '=https' --tlsv1.2 -sSf -L https://install.determinate.systems/nix | sh -s -- install && \
+. /nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh && \
+git clone https://github.com/sfcompute/hardware_report.git && \
+cd hardware_report && \
 nix build
 
-# 4. The binary will be available at:
+# The binary will be available at:
 ./result/bin/hardware_report
 
 # Optional: Install system-wide
 sudo cp ./result/bin/hardware_report /usr/local/bin/
+```
+
+For step-by-step instructions:
+```bash
+# 1. Install Nix (skip if already installed)
+curl --proto '=https' --tlsv1.2 -sSf -L https://install.determinate.systems/nix | sh -s -- install
+
+# 2. Source Nix in current shell (no need to restart terminal)
+. /nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh
+
+# 3. Clone the repository
+git clone https://github.com/sfcompute/hardware_report.git
+cd hardware_report
+
+# 4. Build the project
+nix build
+
+# 5. Run the binary
+sudo ./result/bin/hardware_report
 ```
 
 ### Building with Cargo (Alternative)
