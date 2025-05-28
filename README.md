@@ -7,20 +7,41 @@ This tool is designed to help the open-source GPU infrastructure community by pr
 
 ## Quick Start
 
-### Use as a Binary
-To compile the binary for `hardware_report`:
+### Preferred Method: Build with Nix
+The easiest and most reproducible way to build `hardware_report` is using Nix, which automatically handles all dependencies:
 
 ```bash
-# Build for your platform
-cargo build --release
+# Build the binary
+nix build
 
-# The binary will be available at:
-target/release/hardware_report
+# Run the binary
+sudo ./result/bin/hardware_report
 ```
 
-## ⚠️ IMPORTANT BUILD REQUIREMENT ⚠️
-**DOCKER MUST BE RUNNING ON YOUR LOCAL MACHINE TO COMPILE FOR LINUX ON NON-LINUX SYSTEMS**
-**WITHOUT DOCKER RUNNING, THE BUILD WILL FAIL WHEN EXECUTING `make linux` ON macOS OR WINDOWS**
+### Alternative: Use Development Shell
+For development work, enter a shell with all dependencies:
+
+```bash
+# Enter development environment
+nix develop
+
+# Build with cargo
+cargo build --release
+
+# Run the binary
+sudo ./target/release/hardware_report
+```
+
+### With direnv (Recommended for Development)
+If you have direnv installed:
+
+```bash
+# Allow direnv to automatically load the environment
+direnv allow
+
+# Dependencies are now available in your shell
+cargo build --release
+```
 
 ## Features
 - Comprehensive system information collection including:
@@ -42,23 +63,61 @@ target/release/hardware_report
     - NUMA topology with device affinity
 
 ## Prerequisites
-### Required Software
-- Rust toolchain (cargo, rustc)
-- Make
-- **Docker (REQUIRED for cross-compilation on non-Linux systems)**
 
-### Required System Utilities
+### For Nix Users (Recommended)
+- Nix package manager (single or multi-user installation)
+- That's it! Nix handles all other dependencies
+
+### For Traditional Build Methods
+- Rust toolchain (cargo, rustc)
+- pkg-config
+- OpenSSL development libraries
+- Make (for Makefile builds)
+- Docker (for cross-compilation to Linux on non-Linux systems)
+
+### Required System Utilities (Runtime)
+These utilities must be available on the target system:
 - `nvidia-smi` (required for NVIDIA GPU information)
 - `ipmitool` (required for BMC information)
 - `ethtool` (required for network interface details)
 - `numactl` (required for NUMA topology information)
 - `lscpu` (required for detailed CPU information)
 
-
 ## Building
+
+### Building with Nix (Recommended)
+```bash
+# Build for your platform
+nix build
+
+# The binary will be available at:
+./result/bin/hardware_report
+
+# To build and copy to a specific location:
+nix build && cp ./result/bin/hardware_report /usr/local/bin/
+```
+
+### Building with Cargo (Alternative)
+If you prefer to use cargo directly:
+
+```bash
+# Install dependencies first (example for Ubuntu/Debian)
+sudo apt-get install pkg-config libssl-dev
+
+# Build for your platform
+cargo build --release
+
+# The binary will be available at:
+target/release/hardware_report
+```
+
+### Cross-Platform Builds with Make (Alternative)
 The project includes a Makefile that supports building for both Linux and macOS targets.
 
-### Building for Linux
+#### ⚠️ IMPORTANT BUILD REQUIREMENT ⚠️
+**DOCKER MUST BE RUNNING ON YOUR LOCAL MACHINE TO COMPILE FOR LINUX ON NON-LINUX SYSTEMS**
+
+#### Building for Linux
 ```bash
 # Ensure Docker is running first!
 docker ps  # Should show Docker is running
@@ -70,7 +129,7 @@ make linux
 build/release/hardware_report-linux-x86_64
 ```
 
-### Building for macOS (if on a Mac)
+#### Building for macOS
 ```bash
 # No Docker required for native macOS build
 make macos
@@ -79,12 +138,9 @@ make macos
 build/release/hardware_report-macos-[architecture]
 ```
 
-### Building for all supported platforms
+#### Building for all supported platforms
 ```bash
 # Ensure Docker is running first!
-docker ps  # Should show Docker is running
-
-# Build for all supported platforms
 make all
 ```
 
@@ -130,13 +186,14 @@ chmod +x hardware_report-linux-x86_64
 The program requires root privileges to access certain hardware information. Run it using sudo:
 
 ```bash
-# For Linux binary
-sudo ./build/release/hardware_report-linux-x86_64
+# If built with Nix
+sudo ./result/bin/hardware_report
 
-# For macOS binary
-sudo ./build/release/hardware_report-macos-arm64  # For Apple Silicon
-# or
-sudo ./build/release/hardware_report-macos-x86_64 # For Intel Macs
+# If built with cargo
+sudo ./target/release/hardware_report
+
+# If using pre-built binaries
+sudo ./hardware_report-linux-x86_64
 ```
 
 The program will:
@@ -149,7 +206,7 @@ The program will:
     - GPU count
     - Network interface count
     - Filesystem information
-2. Generate a detailed `server_config.toml` file in the current directory
+2. Generate a detailed `<chassis_serial>_hardware_report.toml` file in the current directory
 
 ## Summarized Node Hardware Output
 ```bash
