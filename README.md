@@ -32,7 +32,7 @@ nix build .#deb && \
 sudo apt update && \
 sudo apt --fix-broken install -y && \
 sudo apt remove -y hardware-report 2>/dev/null || true && \
-sudo apt install -y ./result/hardware-report_0.1.1_amd64.deb && \
+sudo apt install -y ./result/hardware-report_0.1.7_amd64.deb && \
 echo "Installed! Run with: sudo hardware_report" && \
 sudo hardware_report
 ```
@@ -51,7 +51,7 @@ cd hardware_report && \
 rm -rf result && \
 nix build .#deb --rebuild && \
 sudo apt remove -y hardware-report 2>/dev/null || true && \
-sudo apt install -y ./result/hardware-report_0.1.1_amd64.deb && \
+sudo apt install -y ./result/hardware-report_0.1.7_amd64.deb && \
 sudo hardware_report
 ```
 
@@ -169,11 +169,11 @@ sudo cp ./result/bin/hardware_report /usr/local/bin/
 
 # Build Debian package
 nix build .#deb
-# The .deb file will be at: ./result/hardware-report_0.1.1_amd64.deb
+# The .deb file will be at: ./result/hardware-report_0.1.7_amd64.deb
 
 # Install the Debian package with dependencies
 sudo apt update
-sudo apt install -y ./result/hardware-report_0.1.1_amd64.deb
+sudo apt install -y ./result/hardware-report_0.1.7_amd64.deb
 
 # If you get dependency errors, fix them first:
 # sudo apt --fix-broken install -y
@@ -200,7 +200,7 @@ sudo ./result/bin/hardware_report
 # 6. (Optional) Build and install Debian package
 nix build .#deb
 sudo apt update
-sudo apt install -y ./result/hardware-report_0.1.1_amd64.deb
+sudo apt install -y ./result/hardware-report_0.1.7_amd64.deb
 # Now you can run from anywhere: sudo hardware_report
 ```
 
@@ -1014,7 +1014,7 @@ sudo apt remove -y hardware-report
 git pull
 rm -rf result
 nix build .#deb --rebuild
-sudo apt install -y ./result/hardware-report_0.1.1_amd64.deb
+sudo apt install -y ./result/hardware-report_0.1.7_amd64.deb
 ```
 
 ## Error Handling

@@ -46,7 +46,7 @@
         
         hardware_report_unwrapped = pkgs.rustPlatform.buildRustPackage {
           pname = "hardware_report_unwrapped";
-          version = "0.1.1";
+          version = "0.1.7";
           
           src = builtins.path { 
             path = ./.; 
@@ -77,7 +77,7 @@
         
         packages.deb = pkgs.stdenv.mkDerivation {
           pname = "hardware-report";
-          version = "0.1.1";
+          version = "0.1.7";
           
           src = self.packages.${system}.default;
           
@@ -87,15 +87,15 @@
           
           buildPhase = ''
             # Create debian package structure
-            mkdir -p hardware-report_0.1.1_amd64/{DEBIAN,usr/bin,usr/share/doc/hardware-report}
+            mkdir -p hardware-report_0.1.7_amd64/{DEBIAN,usr/bin,usr/share/doc/hardware-report}
             
             # Copy the actual binary (not the wrapper)
-            cp ${hardware_report_unwrapped}/bin/hardware_report hardware-report_0.1.1_amd64/usr/bin/
+            cp ${hardware_report_unwrapped}/bin/hardware_report hardware-report_0.1.7_amd64/usr/bin/
             
             # Create control file
-            cat > hardware-report_0.1.1_amd64/DEBIAN/control << EOF
+            cat > hardware-report_0.1.7_amd64/DEBIAN/control << EOF
 Package: hardware-report
-Version: 0.1.1
+Version: 0.1.7
 Architecture: amd64
 Maintainer: Kenny Sheridan <kenny@sfcompute.com>
 Description: Hardware information collection tool
@@ -107,7 +107,7 @@ Section: utils
 EOF
             
             # Create copyright file
-            cat > hardware-report_0.1.1_amd64/usr/share/doc/hardware-report/copyright << EOF
+            cat > hardware-report_0.1.7_amd64/usr/share/doc/hardware-report/copyright << EOF
 Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
 Upstream-Name: hardware_report
 Source: https://github.com/sfcompute/hardware_report
@@ -118,12 +118,12 @@ License: MIT
 EOF
             
             # Build the deb package
-            dpkg-deb --build hardware-report_0.1.1_amd64
+            dpkg-deb --build hardware-report_0.1.7_amd64
           '';
           
           installPhase = ''
             mkdir -p $out
-            cp hardware-report_0.1.1_amd64.deb $out/
+            cp hardware-report_0.1.7_amd64.deb $out/
           '';
         };
 
