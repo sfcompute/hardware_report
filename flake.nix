@@ -257,19 +257,29 @@ EOF
           # Build the package
           package = self.packages.${system}.default;
           
-          # Run cargo tests
-          cargo-test = pkgs.runCommand "cargo-test" {
-            inherit nativeBuildInputs buildInputs;
+          # Run cargo tests using the same vendored deps as the main build
+          cargo-test = pkgs.stdenv.mkDerivation {
+            name = "cargo-test";
             src = builtins.path { 
               path = ./.; 
               name = "hardware-report-source"; 
             };
-          } ''
-            cd $src
-            export HOME=$TMPDIR
-            ${rustToolchain}/bin/cargo test --release
-            touch $out
-          '';
+            
+            inherit nativeBuildInputs buildInputs;
+            
+            cargoDeps = pkgs.rustPlatform.importCargoLock {
+              lockFile = ./Cargo.lock;
+            };
+            
+            buildPhase = ''
+              export HOME=$TMPDIR
+              ${rustToolchain}/bin/cargo test --release --offline
+            '';
+            
+            installPhase = ''
+              touch $out
+            '';
+          };
           
           # Check formatting
           cargo-fmt = pkgs.runCommand "cargo-fmt-check" {
@@ -284,19 +294,29 @@ EOF
             touch $out
           '';
           
-          # Run clippy
-          cargo-clippy = pkgs.runCommand "cargo-clippy" {
-            inherit nativeBuildInputs buildInputs;
+          # Run clippy using vendored deps
+          cargo-clippy = pkgs.stdenv.mkDerivation {
+            name = "cargo-clippy";
             src = builtins.path { 
               path = ./.; 
               name = "hardware-report-source"; 
             };
-          } ''
-            cd $src
-            export HOME=$TMPDIR
-            ${rustToolchain}/bin/cargo clippy --all-targets -- -D warnings
-            touch $out
-          '';
+            
+            inherit nativeBuildInputs buildInputs;
+            
+            cargoDeps = pkgs.rustPlatform.importCargoLock {
+              lockFile = ./Cargo.lock;
+            };
+            
+            buildPhase = ''
+              export HOME=$TMPDIR
+              ${rustToolchain}/bin/cargo clippy --all-targets --offline -- -D warnings
+            '';
+            
+            installPhase = ''
+              touch $out
+            '';
+          };
         };
       });
 }
