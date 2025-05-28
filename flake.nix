@@ -59,6 +59,10 @@
           
           inherit nativeBuildInputs buildInputs;
           
+          # Speed up builds in CI
+          CARGO_BUILD_JOBS = "8";
+          CARGO_INCREMENTAL = "0";  # Disable incremental compilation in CI
+          
           meta = with pkgs.lib; {
             description = "A tool for generating hardware information reports";
             homepage = "https://github.com/yourusername/hardware_report";

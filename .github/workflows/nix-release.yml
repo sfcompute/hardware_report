@@ -58,6 +58,7 @@ jobs:
 
   build-with-nix:
     needs: create-release
+    timeout-minutes: 60  # Increase timeout for Rust builds
     strategy:
       matrix:
         os: [ubuntu-latest, macos-latest]
@@ -103,6 +104,7 @@ jobs:
 
   build-debian-package:
     needs: create-release
+    timeout-minutes: 45  # Increase timeout for Rust builds
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -144,6 +146,7 @@ jobs:
 
   build-docker:
     needs: create-release
+    timeout-minutes: 45  # Increase timeout for Rust builds
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

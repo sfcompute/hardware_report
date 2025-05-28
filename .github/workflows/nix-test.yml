@@ -8,6 +8,7 @@ on:
 
 jobs:
   test:
+    timeout-minutes: 45  # Increase timeout for Rust builds
     strategy:
       matrix:
         os: [ubuntu-latest, macos-latest]
