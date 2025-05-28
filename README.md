@@ -14,7 +14,7 @@ The easiest and most reproducible way to build `hardware_report` is using Nix, w
 # Install Nix, build, and run in one go:
 curl --proto '=https' --tlsv1.2 -sSf -L https://install.determinate.systems/nix | sh -s -- install && \
 . /nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh && \
-git clone -b add-nix-build-support https://github.com/sfcompute/hardware_report.git && \
+git clone https://github.com/sfcompute/hardware_report.git && \
 cd hardware_report && \
 nix build && \
 echo "Build complete! Run with: sudo ./result/bin/hardware_report" && \
@@ -26,7 +26,7 @@ Or install as a Debian package (recommended for production):
 # One-liner to install Nix, build .deb, and install system-wide:
 curl --proto '=https' --tlsv1.2 -sSf -L https://install.determinate.systems/nix | sh -s -- install && \
 . /nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh && \
-git clone -b add-nix-build-support https://github.com/sfcompute/hardware_report.git && \
+git clone https://github.com/sfcompute/hardware_report.git && \
 cd hardware_report && \
 nix build .#deb && \
 sudo apt update && \
@@ -40,13 +40,13 @@ sudo hardware_report
 ### For Users with Nix Already Installed
 ```bash
 # Quick build and run:
-git clone -b add-nix-build-support https://github.com/sfcompute/hardware_report.git && \
+git clone https://github.com/sfcompute/hardware_report.git && \
 cd hardware_report && \
 nix build && \
 sudo ./result/bin/hardware_report
 
 # Or build and install the Debian package:
-git clone -b add-nix-build-support https://github.com/sfcompute/hardware_report.git && \
+git clone https://github.com/sfcompute/hardware_report.git && \
 cd hardware_report && \
 rm -rf result && \
 nix build .#deb --rebuild && \
@@ -54,8 +54,6 @@ sudo apt remove -y hardware-report 2>/dev/null || true && \
 sudo apt install -y ./result/hardware-report_0.1.1_amd64.deb && \
 sudo hardware_report
 ```
-
-**Note**: The Nix build support is currently in the `add-nix-build-support` branch. Once merged to main, remove the `-b add-nix-build-support` flag from the clone command.
 
 ### Alternative: Use Development Shell
 For development work, enter a shell with all dependencies:
@@ -159,7 +157,7 @@ sudo apt-get update && sudo apt-get install -y \
 # One-liner for fresh systems (installs Nix, clones, and builds):
 curl --proto '=https' --tlsv1.2 -sSf -L https://install.determinate.systems/nix | sh -s -- install && \
 . /nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh && \
-git clone -b add-nix-build-support https://github.com/sfcompute/hardware_report.git && \
+git clone https://github.com/sfcompute/hardware_report.git && \
 cd hardware_report && \
 nix build
 
@@ -189,8 +187,8 @@ curl --proto '=https' --tlsv1.2 -sSf -L https://install.determinate.systems/nix 
 # 2. Source Nix in current shell (no need to restart terminal)
 . /nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh
 
-# 3. Clone the repository with Nix support branch
-git clone -b add-nix-build-support https://github.com/sfcompute/hardware_report.git
+# 3. Clone the repository
+git clone https://github.com/sfcompute/hardware_report.git
 cd hardware_report
 
 # 4. Build the project
@@ -1002,6 +1000,21 @@ type_ = "none"
 vendor = ""
 model = ""
 pci_id = ""
+```
+
+## Troubleshooting
+
+### Debian Package Issues
+If you get errors like "No such file or directory" after installing the .deb package:
+```bash
+# Remove the broken package
+sudo apt remove -y hardware-report
+
+# Pull latest changes and rebuild
+git pull
+rm -rf result
+nix build .#deb --rebuild
+sudo apt install -y ./result/hardware-report_0.1.1_amd64.deb
 ```
 
 ## Error Handling
