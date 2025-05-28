@@ -1,0 +1,171 @@
+name: Nix Build and Release
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  packages: write
+
+jobs:
+  create-release:
+    runs-on: ubuntu-latest
+    outputs:
+      upload_url: ${{ steps.create_release.outputs.upload_url }}
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - name: Get version from tag
+        id: version
+        run: echo "version=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+
+      - name: Create Release
+        id: create_release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ github.ref }}
+          release_name: Release ${{ github.ref_name }}
+          draft: false
+          prerelease: false
+
+  build-with-nix:
+    needs: create-release
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Install Nix
+        uses: cachix/install-nix-action@v24
+        with:
+          extra_nix_config: |
+            experimental-features = nix-command flakes
+      
+      - name: Setup Cachix
+        uses: cachix/cachix-action@v12
+        with:
+          name: hardware-report
+          # If you have a cachix cache, uncomment and add your auth token
+          # authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}'
+      
+      - name: Build binary package
+        run: |
+          nix build .#default --print-build-logs
+          cp -L result/bin/hardware_report hardware_report-${{ matrix.os == 'ubuntu-latest' && 'linux-x86_64' || 'darwin-x86_64' }}
+      
+      - name: Create tarball
+        run: |
+          tar czf hardware_report-${{ matrix.os == 'ubuntu-latest' && 'linux-x86_64' || 'darwin-x86_64' }}-${{ needs.create-release.outputs.version }}.tar.gz hardware_report-${{ matrix.os == 'ubuntu-latest' && 'linux-x86_64' || 'darwin-x86_64' }}
+          sha256sum hardware_report-${{ matrix.os == 'ubuntu-latest' && 'linux-x86_64' || 'darwin-x86_64' }}-${{ needs.create-release.outputs.version }}.tar.gz > hardware_report-${{ matrix.os == 'ubuntu-latest' && 'linux-x86_64' || 'darwin-x86_64' }}-${{ needs.create-release.outputs.version }}.tar.gz.sha256
+      
+      - name: Upload Release Binary
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ needs.create-release.outputs.upload_url }}
+          asset_path: hardware_report-${{ matrix.os == 'ubuntu-latest' && 'linux-x86_64' || 'darwin-x86_64' }}-${{ needs.create-release.outputs.version }}.tar.gz
+          asset_name: hardware_report-${{ matrix.os == 'ubuntu-latest' && 'linux-x86_64' || 'darwin-x86_64' }}-${{ needs.create-release.outputs.version }}.tar.gz
+          asset_content_type: application/gzip
+      
+      - name: Upload SHA256
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ needs.create-release.outputs.upload_url }}
+          asset_path: hardware_report-${{ matrix.os == 'ubuntu-latest' && 'linux-x86_64' || 'darwin-x86_64' }}-${{ needs.create-release.outputs.version }}.tar.gz.sha256
+          asset_name: hardware_report-${{ matrix.os == 'ubuntu-latest' && 'linux-x86_64' || 'darwin-x86_64' }}-${{ needs.create-release.outputs.version }}.tar.gz.sha256
+          asset_content_type: text/plain
+
+  build-debian-package:
+    needs: create-release
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Install Nix
+        uses: cachix/install-nix-action@v24
+        with:
+          extra_nix_config: |
+            experimental-features = nix-command flakes
+      
+      - name: Build Debian package
+        run: |
+          nix build .#deb --print-build-logs
+          cp -L result/*.deb hardware-report_${{ needs.create-release.outputs.version }}_amd64.deb
+      
+      - name: Generate checksums
+        run: |
+          sha256sum hardware-report_${{ needs.create-release.outputs.version }}_amd64.deb > hardware-report_${{ needs.create-release.outputs.version }}_amd64.deb.sha256
+      
+      - name: Upload Debian package
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ needs.create-release.outputs.upload_url }}
+          asset_path: hardware-report_${{ needs.create-release.outputs.version }}_amd64.deb
+          asset_name: hardware-report_${{ needs.create-release.outputs.version }}_amd64.deb
+          asset_content_type: application/vnd.debian.binary-package
+      
+      - name: Upload Debian package checksum
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ needs.create-release.outputs.upload_url }}
+          asset_path: hardware-report_${{ needs.create-release.outputs.version }}_amd64.deb.sha256
+          asset_name: hardware-report_${{ needs.create-release.outputs.version }}_amd64.deb.sha256
+          asset_content_type: text/plain
+
+  build-docker:
+    needs: create-release
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Install Nix
+        uses: cachix/install-nix-action@v24
+        with:
+          extra_nix_config: |
+            experimental-features = nix-command flakes
+      
+      - name: Build Docker image with Nix
+        run: |
+          # Create a Docker image derivation
+          cat > docker.nix << 'EOF'
+          { pkgs ? import <nixpkgs> {} }:
+          let
+            hardware_report = (builtins.getFlake (toString ./.)).packages.${pkgs.system}.default;
+          in
+          pkgs.dockerTools.buildImage {
+            name = "hardware-report";
+            tag = "${{ needs.create-release.outputs.version }}";
+            config = {
+              Cmd = [ "${hardware_report}/bin/hardware_report" ];
+              Env = [
+                "PATH=${pkgs.lib.makeBinPath (with pkgs; [ 
+                  numactl ipmitool ethtool util-linux pciutils 
+                ])}:/usr/local/bin:/usr/bin:/bin"
+              ];
+            };
+          }
+          EOF
+          
+          nix-build docker.nix -o docker-image
+          docker load < docker-image
+      
+      - name: Push to GitHub Container Registry
+        run: |
+          echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+          docker tag hardware-report:${{ needs.create-release.outputs.version }} ghcr.io/${{ github.repository_owner }}/hardware-report:${{ needs.create-release.outputs.version }}
+          docker tag hardware-report:${{ needs.create-release.outputs.version }} ghcr.io/${{ github.repository_owner }}/hardware-report:latest
+          docker push ghcr.io/${{ github.repository_owner }}/hardware-report:${{ needs.create-release.outputs.version }}
+          docker push ghcr.io/${{ github.repository_owner }}/hardware-report:latest
