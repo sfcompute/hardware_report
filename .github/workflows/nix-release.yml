@@ -17,6 +17,8 @@ jobs:
       upload_url: ${{ steps.set_upload_url.outputs.upload_url }}
       version: ${{ steps.version.outputs.version }}
     steps:
+      - uses: actions/checkout@v4
+      
       - name: Get version from tag
         id: version
         run: echo "version=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
