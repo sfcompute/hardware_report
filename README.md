@@ -1,5 +1,5 @@
 # Hardware Report
-A Rust utility that automatically collects and reports detailed hardware information from Linux servers, outputting the data in TOML or JSON format. It can be used both as a command-line tool and as a library in other Rust programs.
+A Rust utility that automatically collects and reports detailed hardware information from Linux servers, outputting the data in TOML format.
 
 The collected data is saved as `<chassis_serialnumber>_hardware_report.toml`, which ensures scalability by creating distinct reports for each server. These reports are useful for infrastructure standardization across heterogeneous bare-metal hardware, allowing operators to automate and manage configurations consistently.
 
@@ -7,54 +7,78 @@ This tool is designed to help the open-source GPU infrastructure community by pr
 
 ## Quick Start
 
-### Use as a Binary
-To compile the binary for `hardware_report`:
+### Preferred Method: Build with Nix
+The easiest and most reproducible way to build `hardware_report` is using Nix, which automatically handles all dependencies:
 
 ```bash
-# Build for your platform
+# Install Nix, build, and run in one go:
+curl --proto '=https' --tlsv1.2 -sSf -L https://install.determinate.systems/nix | sh -s -- install && \
+. /nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh && \
+git clone https://github.com/sfcompute/hardware_report.git && \
+cd hardware_report && \
+nix build && \
+echo "Build complete! Run with: sudo ./result/bin/hardware_report" && \
+sudo ./result/bin/hardware_report
+```
+
+Or install as a Debian package (recommended for production):
+```bash
+# One-liner to install Nix, build .deb, and install system-wide:
+curl --proto '=https' --tlsv1.2 -sSf -L https://install.determinate.systems/nix | sh -s -- install && \
+. /nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh && \
+git clone https://github.com/sfcompute/hardware_report.git && \
+cd hardware_report && \
+nix build .#deb && \
+sudo apt update && \
+sudo apt --fix-broken install -y && \
+sudo apt remove -y hardware-report 2>/dev/null || true && \
+sudo apt install -y ./result/hardware-report_0.1.7_amd64.deb && \
+echo "Installed! Run with: sudo hardware_report" && \
+sudo hardware_report
+```
+
+### For Users with Nix Already Installed
+```bash
+# Quick build and run:
+git clone https://github.com/sfcompute/hardware_report.git && \
+cd hardware_report && \
+nix build && \
+sudo ./result/bin/hardware_report
+
+# Or build and install the Debian package:
+git clone https://github.com/sfcompute/hardware_report.git && \
+cd hardware_report && \
+rm -rf result && \
+nix build .#deb --rebuild && \
+sudo apt remove -y hardware-report 2>/dev/null || true && \
+sudo apt install -y ./result/hardware-report_0.1.7_amd64.deb && \
+sudo hardware_report
+```
+
+### Alternative: Use Development Shell
+For development work, enter a shell with all dependencies:
+
+```bash
+# Enter development environment
+nix develop
+
+# Build with cargo
 cargo build --release
 
-# The binary will be available at:
-target/release/hardware_report
+# Run the binary
+sudo ./target/release/hardware_report
 ```
 
-### Use as a Library
-Add `hardware_report` to your `Cargo.toml`:
+### With direnv (Recommended for Development)
+If you have direnv installed:
 
-```toml
-[dependencies]
-hardware_report = { path = "path/to/hardware_report" }
-# or from a git repository:
-# hardware_report = { git = "https://github.com/sfcompute/hardware_report" }
+```bash
+# Allow direnv to automatically load the environment
+direnv allow
+
+# Dependencies are now available in your shell
+cargo build --release
 ```
-
-Basic usage in your Rust code:
-
-```rust
-use hardware_report::ServerInfo;
-
-fn main() -> Result<(), Box<dyn std::error::Error>> {
-    // Collect hardware information
-    let server_info = ServerInfo::collect()?;
-    
-    // Access the data
-    println!("Hostname: {}", server_info.hostname);
-    println!("Total Memory: {}", server_info.summary.total_memory);
-    println!("CPU: {}", server_info.summary.cpu_summary);
-    
-    // Serialize to JSON or TOML
-    let json = serde_json::to_string_pretty(&server_info)?;
-    let toml = toml::to_string_pretty(&server_info)?;
-    
-    Ok(())
-}
-```
-
-See the `examples/` directory for more detailed usage examples.
-
-## ⚠️ IMPORTANT BUILD REQUIREMENT ⚠️
-**DOCKER MUST BE RUNNING ON YOUR LOCAL MACHINE TO COMPILE FOR LINUX ON NON-LINUX SYSTEMS**
-**WITHOUT DOCKER RUNNING, THE BUILD WILL FAIL WHEN EXECUTING `make linux` ON macOS OR WINDOWS**
 
 ## Features
 - Comprehensive system information collection including:
@@ -76,23 +100,131 @@ See the `examples/` directory for more detailed usage examples.
     - NUMA topology with device affinity
 
 ## Prerequisites
-### Required Software
+
+### For Nix Users (Recommended)
+- Nix package manager - see installation instructions below
+- That's it! Nix handles ALL dependencies including runtime tools
+
+#### Installing Nix (if not already installed)
+```bash
+# On Linux or macOS - Install Nix with the official installer
+curl --proto '=https' --tlsv1.2 -sSf -L https://install.determinate.systems/nix | sh -s -- install
+
+# After installation, restart your terminal or run:
+. /nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh
+
+# Verify installation
+nix --version
+
+# Optional: If you see download buffer warnings, increase the buffer size:
+echo "download-buffer-size = 268435456" | sudo tee -a /etc/nix/nix.conf
+sudo systemctl restart nix-daemon
+```
+
+### For Traditional Build Methods
 - Rust toolchain (cargo, rustc)
-- Make
-- **Docker (REQUIRED for cross-compilation on non-Linux systems)**
+- pkg-config
+- OpenSSL development libraries
+- Make (for Makefile builds)
+- Docker (for cross-compilation to Linux on non-Linux systems)
 
-### Required System Utilities
-- `nvidia-smi` (required for NVIDIA GPU information)
-- `ipmitool` (required for BMC information)
-- `ethtool` (required for network interface details)
-- `numactl` (required for NUMA topology information)
-- `lscpu` (required for detailed CPU information)
+### Required System Utilities (Runtime)
 
+**When built with Nix**: All runtime dependencies are automatically included! The Nix-built binary comes with a wrapper that provides:
+- `numactl` - for NUMA topology information
+- `ipmitool` - for BMC information  
+- `ethtool` - for network interface details
+- `lscpu` - for detailed CPU information
+- `lspci` - for PCI device information
+
+**Note**: `nvidia-smi` must still be provided by your system's NVIDIA driver installation.
+
+**When built without Nix** (cargo, make, or pre-built binaries):
+```bash
+# Install required runtime dependencies on Ubuntu/Debian:
+sudo apt-get update && sudo apt-get install -y \
+  numactl \
+  ipmitool \
+  ethtool \
+  util-linux  # for lscpu
+  pciutils    # for lspci
+```
 
 ## Building
+
+### Building with Nix (Recommended)
+```bash
+# One-liner for fresh systems (installs Nix, clones, and builds):
+curl --proto '=https' --tlsv1.2 -sSf -L https://install.determinate.systems/nix | sh -s -- install && \
+. /nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh && \
+git clone https://github.com/sfcompute/hardware_report.git && \
+cd hardware_report && \
+nix build
+
+# The binary will be available at:
+./result/bin/hardware_report
+
+# Optional: Install system-wide
+sudo cp ./result/bin/hardware_report /usr/local/bin/
+
+# Build Debian package
+nix build .#deb
+# The .deb file will be at: ./result/hardware-report_0.1.7_amd64.deb
+
+# Install the Debian package with dependencies
+sudo apt update
+sudo apt install -y ./result/hardware-report_0.1.7_amd64.deb
+
+# If you get dependency errors, fix them first:
+# sudo apt --fix-broken install -y
+```
+
+For step-by-step instructions:
+```bash
+# 1. Install Nix (skip if already installed)
+curl --proto '=https' --tlsv1.2 -sSf -L https://install.determinate.systems/nix | sh -s -- install
+
+# 2. Source Nix in current shell (no need to restart terminal)
+. /nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh
+
+# 3. Clone the repository
+git clone https://github.com/sfcompute/hardware_report.git
+cd hardware_report
+
+# 4. Build the project
+nix build
+
+# 5. Run the binary
+sudo ./result/bin/hardware_report
+
+# 6. (Optional) Build and install Debian package
+nix build .#deb
+sudo apt update
+sudo apt install -y ./result/hardware-report_0.1.7_amd64.deb
+# Now you can run from anywhere: sudo hardware_report
+```
+
+### Building with Cargo (Alternative)
+If you prefer to use cargo directly:
+
+```bash
+# Install dependencies first (example for Ubuntu/Debian)
+sudo apt-get install pkg-config libssl-dev
+
+# Build for your platform
+cargo build --release
+
+# The binary will be available at:
+target/release/hardware_report
+```
+
+### Cross-Platform Builds with Make (Alternative)
 The project includes a Makefile that supports building for both Linux and macOS targets.
 
-### Building for Linux
+#### ⚠️ IMPORTANT BUILD REQUIREMENT ⚠️
+**DOCKER MUST BE RUNNING ON YOUR LOCAL MACHINE TO COMPILE FOR LINUX ON NON-LINUX SYSTEMS**
+
+#### Building for Linux
 ```bash
 # Ensure Docker is running first!
 docker ps  # Should show Docker is running
@@ -104,7 +236,7 @@ make linux
 build/release/hardware_report-linux-x86_64
 ```
 
-### Building for macOS (if on a Mac)
+#### Building for macOS
 ```bash
 # No Docker required for native macOS build
 make macos
@@ -113,12 +245,9 @@ make macos
 build/release/hardware_report-macos-[architecture]
 ```
 
-### Building for all supported platforms
+#### Building for all supported platforms
 ```bash
 # Ensure Docker is running first!
-docker ps  # Should show Docker is running
-
-# Build for all supported platforms
 make all
 ```
 
@@ -160,67 +289,20 @@ tar xzf hardware_report-linux-x86_64-*.tar.gz
 chmod +x hardware_report-linux-x86_64
 ```
 
-## Library API
-
-When using `hardware_report` as a library, the main entry point is the `ServerInfo` struct and its `collect()` method. Here are the key types available:
-
-### Main Types
-- `ServerInfo` - The main struct containing all hardware information
-- `SystemSummary` - High-level system overview
-- `HardwareInfo` - Detailed hardware specifications
-- `NetworkInfo` - Network interface details
-- `posting::post_data()` - Function to POST data to a remote endpoint
-
-### Example: Filtering by NUMA Node
-```rust
-use hardware_report::ServerInfo;
-
-let info = ServerInfo::collect()?;
-
-// Find all GPUs on NUMA node 0
-let gpus_on_node_0: Vec<_> = info.hardware.gpus.devices.iter()
-    .filter(|gpu| gpu.numa_node == Some(0))
-    .collect();
-
-// Find all network interfaces on NUMA node 1
-let nics_on_node_1: Vec<_> = info.network.interfaces.iter()
-    .filter(|nic| nic.numa_node == Some(1))
-    .collect();
-```
-
-### Example: Custom Serialization
-```rust
-use hardware_report::{ServerInfo, posting::PostPayload};
-use std::collections::HashMap;
-
-let info = ServerInfo::collect()?;
-
-// Create a custom payload with labels
-let mut labels = HashMap::new();
-labels.insert("datacenter".to_string(), "us-west-2".to_string());
-labels.insert("rack".to_string(), "A42".to_string());
-
-let payload = PostPayload {
-    labels,
-    result: info,
-};
-
-// Save to custom format
-let json = serde_json::to_string_pretty(&payload)?;
-std::fs::write("custom_report.json", json)?;
-```
-
 ## Usage
 The program requires root privileges to access certain hardware information. Run it using sudo:
 
 ```bash
-# For Linux binary
-sudo ./build/release/hardware_report-linux-x86_64
+# If built with Nix (includes all dependencies!)
+sudo ./result/bin/hardware_report
 
-# For macOS binary
-sudo ./build/release/hardware_report-macos-arm64  # For Apple Silicon
-# or
-sudo ./build/release/hardware_report-macos-x86_64 # For Intel Macs
+# If built with cargo (install dependencies first)
+sudo apt-get update && sudo apt-get install -y numactl ipmitool ethtool util-linux pciutils
+sudo ./target/release/hardware_report
+
+# If using pre-built binaries (install dependencies first)
+sudo apt-get update && sudo apt-get install -y numactl ipmitool ethtool util-linux pciutils
+sudo ./hardware_report-linux-x86_64
 ```
 
 The program will:
@@ -233,7 +315,7 @@ The program will:
     - GPU count
     - Network interface count
     - Filesystem information
-2. Generate a detailed `server_config.toml` file in the current directory
+2. Generate a detailed `<chassis_serial>_hardware_report.toml` file in the current directory
 
 ## Summarized Node Hardware Output
 ```bash
@@ -918,6 +1000,21 @@ type_ = "none"
 vendor = ""
 model = ""
 pci_id = ""
+```
+
+## Troubleshooting
+
+### Debian Package Issues
+If you get errors like "No such file or directory" after installing the .deb package:
+```bash
+# Remove the broken package
+sudo apt remove -y hardware-report
+
+# Pull latest changes and rebuild
+git pull
+rm -rf result
+nix build .#deb --rebuild
+sudo apt install -y ./result/hardware-report_0.1.7_amd64.deb
 ```
 
 ## Error Handling
