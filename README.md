@@ -16,9 +16,12 @@ curl --proto '=https' --tlsv1.2 -sSf -L https://install.determinate.systems/nix 
 . /nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh && \
 git clone https://github.com/sfcompute/hardware_report.git && \
 cd hardware_report && \
+git checkout add-nix-build-support && \
 nix build && \
 echo "Build complete! Run with: sudo ./result/bin/hardware_report"
 ```
+
+**Note**: The Nix build support is currently in the `add-nix-build-support` branch. Once merged to main, you can skip the `git checkout` step.
 
 ### Alternative: Use Development Shell
 For development work, enter a shell with all dependencies:
@@ -106,6 +109,7 @@ curl --proto '=https' --tlsv1.2 -sSf -L https://install.determinate.systems/nix 
 . /nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh && \
 git clone https://github.com/sfcompute/hardware_report.git && \
 cd hardware_report && \
+git checkout add-nix-build-support && \
 nix build
 
 # The binary will be available at:
@@ -123,9 +127,10 @@ curl --proto '=https' --tlsv1.2 -sSf -L https://install.determinate.systems/nix 
 # 2. Source Nix in current shell (no need to restart terminal)
 . /nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh
 
-# 3. Clone the repository
+# 3. Clone the repository and checkout branch with Nix support
 git clone https://github.com/sfcompute/hardware_report.git
 cd hardware_report
+git checkout add-nix-build-support  # Remove this line once merged to main
 
 # 4. Build the project
 nix build
