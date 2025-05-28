@@ -96,6 +96,10 @@ curl --proto '=https' --tlsv1.2 -sSf -L https://install.determinate.systems/nix 
 
 # Verify installation
 nix --version
+
+# Optional: If you see download buffer warnings, increase the buffer size:
+echo "download-buffer-size = 268435456" | sudo tee -a /etc/nix/nix.conf
+sudo systemctl restart nix-daemon
 ```
 
 ### For Traditional Build Methods

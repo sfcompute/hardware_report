@@ -13,6 +13,10 @@
         overlays = [ (import rust-overlay) ];
         pkgs = import nixpkgs {
           inherit system overlays;
+          config = {
+            # Increase download buffer size to prevent warnings
+            download-buffer-size = 256 * 1024 * 1024; # 256 MB
+          };
         };
         
         rustToolchain = pkgs.rust-bin.stable.latest.default.override {
