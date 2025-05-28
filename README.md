@@ -18,6 +18,7 @@ git clone -b add-nix-build-support https://github.com/sfcompute/hardware_report.
 cd hardware_report && \
 nix build && \
 echo "Build complete! Run with: sudo ./result/bin/hardware_report"
+sudo ./result/bin/hardware_report
 ```
 
 **Note**: The Nix build support is currently in the `add-nix-build-support` branch. Once merged to main, remove the `-b add-nix-build-support` flag from the clone command.
