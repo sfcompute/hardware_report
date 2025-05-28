@@ -11,6 +11,13 @@ This tool is designed to help the open-source GPU infrastructure community by pr
 The easiest and most reproducible way to build `hardware_report` is using Nix, which automatically handles all dependencies:
 
 ```bash
+# If you don't have Nix installed, install it first:
+curl --proto '=https' --tlsv1.2 -sSf -L https://install.determinate.systems/nix | sh -s -- install
+
+# Restart your terminal, then clone and build:
+git clone https://github.com/sfcompute/hardware_report.git
+cd hardware_report
+
 # Build the binary
 nix build
 
@@ -65,8 +72,20 @@ cargo build --release
 ## Prerequisites
 
 ### For Nix Users (Recommended)
-- Nix package manager (single or multi-user installation)
+- Nix package manager - see installation instructions below
 - That's it! Nix handles all other dependencies
+
+#### Installing Nix (if not already installed)
+```bash
+# On Linux or macOS - Install Nix with the official installer
+curl --proto '=https' --tlsv1.2 -sSf -L https://install.determinate.systems/nix | sh -s -- install
+
+# After installation, restart your terminal or run:
+. /nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh
+
+# Verify installation
+nix --version
+```
 
 ### For Traditional Build Methods
 - Rust toolchain (cargo, rustc)
@@ -87,14 +106,24 @@ These utilities must be available on the target system:
 
 ### Building with Nix (Recommended)
 ```bash
-# Build for your platform
+# Complete copy-paste instructions for new users:
+
+# 1. Install Nix (skip if already installed)
+curl --proto '=https' --tlsv1.2 -sSf -L https://install.determinate.systems/nix | sh -s -- install
+# Restart your terminal after installation
+
+# 2. Clone the repository
+git clone https://github.com/sfcompute/hardware_report.git
+cd hardware_report
+
+# 3. Build the project
 nix build
 
-# The binary will be available at:
+# 4. The binary will be available at:
 ./result/bin/hardware_report
 
-# To build and copy to a specific location:
-nix build && cp ./result/bin/hardware_report /usr/local/bin/
+# Optional: Install system-wide
+sudo cp ./result/bin/hardware_report /usr/local/bin/
 ```
 
 ### Building with Cargo (Alternative)
