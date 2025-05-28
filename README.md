@@ -31,8 +31,27 @@ cd hardware_report && \
 nix build .#deb && \
 sudo apt update && \
 sudo apt --fix-broken install -y && \
+sudo apt remove -y hardware-report 2>/dev/null || true && \
 sudo apt install -y ./result/hardware-report_0.1.1_amd64.deb && \
 echo "Installed! Run with: sudo hardware_report" && \
+sudo hardware_report
+```
+
+### For Users with Nix Already Installed
+```bash
+# Quick build and run:
+git clone -b add-nix-build-support https://github.com/sfcompute/hardware_report.git && \
+cd hardware_report && \
+nix build && \
+sudo ./result/bin/hardware_report
+
+# Or build and install the Debian package:
+git clone -b add-nix-build-support https://github.com/sfcompute/hardware_report.git && \
+cd hardware_report && \
+rm -rf result && \
+nix build .#deb --rebuild && \
+sudo apt remove -y hardware-report 2>/dev/null || true && \
+sudo apt install -y ./result/hardware-report_0.1.1_amd64.deb && \
 sudo hardware_report
 ```
 

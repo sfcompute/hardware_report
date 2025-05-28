@@ -89,8 +89,8 @@
             # Create debian package structure
             mkdir -p hardware-report_0.1.1_amd64/{DEBIAN,usr/bin,usr/share/doc/hardware-report}
             
-            # Copy the wrapped binary
-            cp ${self.packages.${system}.default}/bin/hardware_report hardware-report_0.1.1_amd64/usr/bin/
+            # Copy the actual binary (not the wrapper)
+            cp ${hardware_report_unwrapped}/bin/hardware_report hardware-report_0.1.1_amd64/usr/bin/
             
             # Create control file
             cat > hardware-report_0.1.1_amd64/DEBIAN/control << EOF
