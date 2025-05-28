@@ -29,7 +29,8 @@ curl --proto '=https' --tlsv1.2 -sSf -L https://install.determinate.systems/nix 
 git clone -b add-nix-build-support https://github.com/sfcompute/hardware_report.git && \
 cd hardware_report && \
 nix build .#deb && \
-sudo dpkg -i ./result/hardware-report_0.1.1_amd64.deb && \
+sudo apt update && \
+sudo apt install -y ./result/hardware-report_0.1.1_amd64.deb && \
 echo "Installed! Run with: sudo hardware_report" && \
 sudo hardware_report
 ```
@@ -152,8 +153,9 @@ sudo cp ./result/bin/hardware_report /usr/local/bin/
 nix build .#deb
 # The .deb file will be at: ./result/hardware-report_0.1.1_amd64.deb
 
-# Install the Debian package
-sudo dpkg -i ./result/hardware-report_0.1.1_amd64.deb
+# Install the Debian package with dependencies
+sudo apt update
+sudo apt install -y ./result/hardware-report_0.1.1_amd64.deb
 ```
 
 For step-by-step instructions:
@@ -176,7 +178,8 @@ sudo ./result/bin/hardware_report
 
 # 6. (Optional) Build and install Debian package
 nix build .#deb
-sudo dpkg -i ./result/hardware-report_0.1.1_amd64.deb
+sudo apt update
+sudo apt install -y ./result/hardware-report_0.1.1_amd64.deb
 # Now you can run from anywhere: sudo hardware_report
 ```
 
