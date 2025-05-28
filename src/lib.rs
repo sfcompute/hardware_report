@@ -342,9 +342,16 @@ impl ServerInfo {
             ("lspci", "PCI device information"),
             ("ethtool", "Network interface information"),
             ("dmidecode", "System hardware information"),
+            ("lscpu", "CPU information"),
+            ("ip", "Network interface details"),
+            ("lsblk", "Storage device information"),
+            ("hostname", "System hostname"),
+            ("free", "Memory usage information"),
+            ("df", "Filesystem information"),
         ];
 
         let mut missing_packages = Vec::new();
+        let mut missing_info = Vec::new();
 
         // Check which packages are missing
         for (package, purpose) in &required_packages {
@@ -352,12 +359,77 @@ impl ServerInfo {
 
             if !status.status.success() {
                 missing_packages.push(*package);
-                eprintln!("Missing {}: required for {}", package, purpose);
+                missing_info.push(format!("  - {}: {}", package, purpose));
             }
         }
 
         if !missing_packages.is_empty() {
-            Self::install_missing_packages()?;
+            eprintln!("\nWarning: Some system utilities are not installed.");
+            eprintln!("Missing utilities:");
+            for info in &missing_info {
+                eprintln!("{}", info);
+            }
+            eprintln!("\nSome hardware information may be incomplete or unavailable.");
+
+            // Separate packages that are typically pre-installed vs specialized tools
+            let core_utils = ["hostname", "ip", "lscpu", "free", "df", "lsblk"];
+            let specialized_tools = ["numactl", "lspci", "ethtool", "dmidecode"];
+
+            let missing_core: Vec<&str> = missing_packages
+                .iter()
+                .filter(|&&pkg| core_utils.contains(&pkg))
+                .copied()
+                .collect();
+            let missing_specialized: Vec<&str> = missing_packages
+                .iter()
+                .filter(|&&pkg| specialized_tools.contains(&pkg))
+                .copied()
+                .collect();
+
+            if !missing_core.is_empty() {
+                eprintln!("\nCore utilities missing (usually pre-installed):");
+                eprintln!(
+                    "  Ubuntu/Debian: sudo apt install {}",
+                    missing_core
+                        .iter()
+                        .map(|&pkg| match pkg {
+                            "ip" => "iproute2",
+                            "lscpu" | "lsblk" => "util-linux",
+                            "free" | "hostname" => "procps",
+                            "df" => "coreutils",
+                            _ => pkg,
+                        })
+                        .collect::<Vec<_>>()
+                        .join(" ")
+                );
+                eprintln!(
+                    "  RHEL/Fedora: sudo dnf install {}",
+                    missing_core
+                        .iter()
+                        .map(|&pkg| match pkg {
+                            "ip" => "iproute",
+                            "lscpu" | "lsblk" => "util-linux",
+                            "free" => "procps-ng",
+                            "hostname" | "df" => "coreutils",
+                            _ => pkg,
+                        })
+                        .collect::<Vec<_>>()
+                        .join(" ")
+                );
+            }
+
+            if !missing_specialized.is_empty() {
+                eprintln!("\nSpecialized tools missing:");
+                eprintln!(
+                    "  Ubuntu/Debian: sudo apt install {}",
+                    missing_specialized.join(" ")
+                );
+                eprintln!(
+                    "  RHEL/Fedora: sudo dnf install {}",
+                    missing_specialized.join(" ")
+                );
+            }
+            eprintln!();
         }
 
         Ok(missing_packages)
@@ -435,71 +507,128 @@ impl ServerInfo {
         }
     }
 
-    fn install_missing_packages() -> Result<(), Box<dyn Error>> {
-        let required_packages = vec![
-            ("numactl", "NUMA topology information"),
-            ("lspci", "PCI device information"),
-            ("ethtool", "Network interface information"),
-            ("dmidecode", "System hardware information"),
+    /// Automatically installs numactl if not present
+    fn auto_install_numactl() -> Result<bool, Box<dyn Error>> {
+        // Check if we have sudo/root privileges
+        let euid = unsafe { libc::geteuid() };
+        let use_sudo = euid != 0;
+
+        // Detect the package manager
+        let pkg_managers = vec![
+            ("apt-get", vec!["update"], vec!["install", "-y", "numactl"]),
+            ("apt", vec!["update"], vec!["install", "-y", "numactl"]),
+            ("dnf", vec![], vec!["install", "-y", "numactl"]),
+            ("yum", vec![], vec!["install", "-y", "numactl"]),
+            ("zypper", vec!["refresh"], vec!["install", "-y", "numactl"]),
         ];
 
-        let mut missing_packages = Vec::new();
+        for (manager, update_args, install_args) in pkg_managers {
+            // Check if the package manager exists
+            if Command::new("which")
+                .arg(manager)
+                .output()?
+                .status
+                .success()
+            {
+                // Run update command if needed
+                if !update_args.is_empty() {
+                    let mut update_cmd = if use_sudo {
+                        let mut cmd = Command::new("sudo");
+                        cmd.arg(manager);
+                        cmd
+                    } else {
+                        Command::new(manager)
+                    };
 
-        // Check which packages are missing
-        for (package, purpose) in &required_packages {
-            let status = Command::new("which").arg(package).output()?;
+                    update_cmd.args(&update_args);
+                    let _ = update_cmd.output(); // Ignore update errors
+                }
 
-            if !status.status.success() {
-                missing_packages.push(*package);
-                eprintln!("Missing {}: required for {}", package, purpose);
-            }
-        }
+                // Run install command
+                let mut install_cmd = if use_sudo {
+                    let mut cmd = Command::new("sudo");
+                    cmd.arg(manager);
+                    cmd
+                } else {
+                    Command::new(manager)
+                };
 
-        if !missing_packages.is_empty() {
-            eprintln!("\nSome required packages are missing. Attempting to install them...");
+                install_cmd.args(&install_args);
+                let output = install_cmd.output()?;
 
-            // Detect package manager
-            let mut package_manager = "apt-get";
-            let status = Command::new("which").arg("dnf").output();
-            if let Ok(output) = status {
                 if output.status.success() {
-                    package_manager = "dnf";
+                    // Verify numactl was installed
+                    if Command::new("which")
+                        .arg("numactl")
+                        .output()?
+                        .status
+                        .success()
+                    {
+                        return Ok(true);
+                    }
                 }
             }
-
-            // Install missing packages
-            let install_command = Command::new("sudo")
-                .arg(package_manager)
-                .arg("install")
-                .arg("-y")
-                .args(&missing_packages)
-                .status()?;
-
-            if !install_command.success() {
-                return Err("Failed to install required system packages. Please install them manually and try again.".into());
-            }
         }
 
-        Ok(())
+        Ok(false)
+    }
+
+    // Remove automatic package installation
+    #[allow(dead_code)]
+    fn suggest_package_installation(missing_packages: &[&str]) {
+        if !missing_packages.is_empty() {
+            eprintln!(
+                "\nTo get complete hardware information, please install the missing utilities:"
+            );
+            eprintln!("\nFor Ubuntu/Debian:");
+            eprintln!("  sudo apt install {}", missing_packages.join(" "));
+            eprintln!("\nFor RHEL/Fedora:");
+            eprintln!("  sudo dnf install {}", missing_packages.join(" "));
+        }
     }
 
     /// Gets hostname of the server
     fn get_hostname() -> Result<String, Box<dyn Error>> {
-        let output = Command::new("hostname").output()?;
-        Ok(String::from_utf8(output.stdout)?.trim().to_string())
+        match Command::new("hostname").output() {
+            Ok(output) => Ok(String::from_utf8(output.stdout)?.trim().to_string()),
+            Err(_) => {
+                // Fallback to reading /etc/hostname or use system name
+                if let Ok(contents) = std::fs::read_to_string("/etc/hostname") {
+                    Ok(contents.trim().to_string())
+                } else {
+                    Ok("unknown".to_string())
+                }
+            }
+        }
     }
 
     fn get_fqdn() -> Result<String, Box<dyn Error>> {
-        let output = Command::new("hostname").args(&["-f"]).output()?;
-        Ok(String::from_utf8(output.stdout)?.trim().to_string())
+        match Command::new("hostname").args(&["-f"]).output() {
+            Ok(output) => Ok(String::from_utf8(output.stdout)?.trim().to_string()),
+            Err(_) => {
+                // Fallback to hostname if FQDN lookup fails
+                Self::get_hostname()
+            }
+        }
     }
 
     /// Gets PCI information for a device
     fn get_pci_info(pci_addr: &str) -> Result<(String, String, String), Box<dyn Error>> {
         // Run lspci with verbose output and machine-readable format
-        let output = Command::new("lspci")
+        let output = match Command::new("lspci")
             .args(&["-vmm", "-s", pci_addr])
-            .output()?;
+            .output()
+        {
+            Ok(output) => output,
+            Err(_) => {
+                // lspci not available, return unknown values
+                return Ok((
+                    "Unknown".to_string(),
+                    "Unknown".to_string(),
+                    "Unknown".to_string(),
+                ));
+            }
+        };
 
         let output_str = String::from_utf8(output.stdout)?;
         let mut vendor = String::new();
@@ -530,9 +659,13 @@ impl ServerInfo {
         }
 
         // Get vendor and device IDs using -n flag
-        let id_output = Command::new("lspci")
-            .args(&["-n", "-s", pci_addr])
-            .output()?;
+        let id_output = match Command::new("lspci").args(&["-n", "-s", pci_addr]).output() {
+            Ok(output) => output,
+            Err(_) => {
+                // Return early if lspci is not available
+                return Ok((vendor, device, "Unknown".to_string()));
+            }
+        };
 
         let id_str = String::from_utf8(id_output.stdout)?;
         if let Some(line) = id_str.lines().next() {
@@ -613,7 +746,13 @@ impl ServerInfo {
         }
 
         // Get CPU to node mapping
-        let output = Command::new("lscpu").args(&["-p=cpu,node"]).output()?;
+        let output = match Command::new("lscpu").args(&["-p=cpu,node"]).output() {
+            Ok(output) => output,
+            Err(_) => {
+                // lscpu not available, skip CPU to node mapping
+                return Ok(nodes);
+            }
+        };
 
         let output_str = String::from_utf8(output.stdout)?;
         for line in output_str.lines() {
@@ -639,7 +778,13 @@ impl ServerInfo {
     }
 
     fn collect_ip_addresses() -> Result<Vec<InterfaceIPs>, Box<dyn Error>> {
-        let output = Command::new("ip").args(&["-j", "addr"]).output()?;
+        let output = match Command::new("ip").args(&["-j", "addr"]).output() {
+            Ok(output) => output,
+            Err(_) => {
+                // ip command not available, return empty list
+                return Ok(Vec::new());
+            }
+        };
         let json: serde_json::Value = serde_json::from_slice(&output.stdout)?;
 
         let mut interfaces = Vec::new();
@@ -723,14 +868,19 @@ impl ServerInfo {
 
     /// Collects all server information
     pub fn collect() -> Result<Self, Box<dyn Error>> {
-        // Check dependencies first
+        // Check dependencies first and warn about missing packages
         let missing_packages = Self::check_dependencies()?;
 
-        // If any essential packages are missing, return an error
-        if !missing_packages.is_empty() {
-            return Err(
-                "Missing required system packages. Please install them and try again.".into(),
-            );
+        // Automatically install numactl if it's missing
+        if missing_packages.contains(&"numactl") {
+            eprintln!("numactl is not installed. Attempting automatic installation...");
+
+            // Try to detect the package manager and install numactl
+            if Self::auto_install_numactl()? {
+                eprintln!("Successfully installed numactl.");
+            } else {
+                eprintln!("Warning: Could not automatically install numactl. NUMA information may be incomplete.");
+            }
         }
 
         // Check if running as root
@@ -819,9 +969,16 @@ impl ServerInfo {
 
     /// Gets filesystem information
     fn get_filesystems() -> Result<Vec<String>, Box<dyn Error>> {
-        let output = Command::new("df")
+        let output = match Command::new("df")
             .args(["-h", "--output=source,fstype,size,used,avail,target"])
-            .output()?;
+            .output()
+        {
+            Ok(output) => output,
+            Err(_) => {
+                // df not available, return empty list
+                return Ok(Vec::new());
+            }
+        };
 
         let output_str = String::from_utf8(output.stdout)?;
         let mut filesystems = Vec::new();
@@ -943,7 +1100,21 @@ impl ServerInfo {
 
     /// Gets detailed CPU topology information
     fn get_cpu_topology() -> Result<CpuTopology, Box<dyn Error>> {
-        let output = Command::new("lscpu").args(&["-J"]).output()?;
+        let output = match Command::new("lscpu").args(&["-J"]).output() {
+            Ok(output) => output,
+            Err(_) => {
+                // lscpu not available, return default topology
+                return Ok(CpuTopology {
+                    total_cores: 0,
+                    total_threads: 0,
+                    sockets: 0,
+                    cores_per_socket: 0,
+                    threads_per_core: 0,
+                    numa_nodes: 0,
+                    cpu_model: "Unknown".to_string(),
+                });
+            }
+        };
 
         let json: serde_json::Value = serde_json::from_slice(&output.stdout)?;
         let mut info_map = HashMap::new();
@@ -1085,7 +1256,19 @@ impl ServerInfo {
     /// Collects CPU information by parsing 'lscpu' output.
     fn collect_cpu_info() -> Result<CpuInfo, Box<dyn Error>> {
         // Use 'lscpu -J' for JSON output to ensure reliable parsing.
-        let output = Command::new("lscpu").args(&["-J"]).output()?;
+        let output = match Command::new("lscpu").args(&["-J"]).output() {
+            Ok(output) => output,
+            Err(_) => {
+                // lscpu not available, return basic CPU info
+                return Ok(CpuInfo {
+                    model: "Unknown".to_string(),
+                    cores: 0,
+                    threads: 0,
+                    sockets: 0,
+                    speed: "Unknown".to_string(),
+                });
+            }
+        };
         let json: serde_json::Value = serde_json::from_slice(&output.stdout)?;
 
         // Build a map of lscpu key-value pairs.
@@ -1127,7 +1310,19 @@ impl ServerInfo {
 
     /// Collects memory information by parsing 'dmidecode' output.
     fn collect_memory_info() -> Result<MemoryInfo, Box<dyn Error>> {
-        let output = Command::new("dmidecode").args(&["-t", "memory"]).output()?;
+        let output = match Command::new("dmidecode").args(&["-t", "memory"]).output() {
+            Ok(output) => output,
+            Err(_) => {
+                // dmidecode not available, try to get basic info from /proc/meminfo
+                let total = Self::get_total_memory()?;
+                return Ok(MemoryInfo {
+                    total,
+                    type_: "Unknown".to_string(),
+                    speed: "Unknown".to_string(),
+                    modules: Vec::new(),
+                });
+            }
+        };
         let output_str = String::from_utf8(output.stdout)?;
 
         // Parse dmidecode output for detailed memory information.
@@ -1174,7 +1369,25 @@ impl ServerInfo {
 
     /// Retrieves the total memory size using 'free -h'.
     fn get_total_memory() -> Result<String, Box<dyn Error>> {
-        let output = Command::new("free").arg("-h").output()?;
+        let output = match Command::new("free").arg("-h").output() {
+            Ok(output) => output,
+            Err(_) => {
+                // free command not available, try reading from /proc/meminfo
+                if let Ok(contents) = std::fs::read_to_string("/proc/meminfo") {
+                    for line in contents.lines() {
+                        if line.starts_with("MemTotal:") {
+                            let parts: Vec<&str> = line.split_whitespace().collect();
+                            if parts.len() >= 2 {
+                                let kb: u64 = parts[1].parse().unwrap_or(0);
+                                let gb = kb as f64 / 1024.0 / 1024.0;
+                                return Ok(format!("{:.1}G", gb));
+                            }
+                        }
+                    }
+                }
+                return Ok("Unknown".to_string());
+            }
+        };
         let output_str = String::from_utf8(output.stdout)?;
         let re = Regex::new(r"Mem:\s+(\S+)")?;
 
@@ -1211,9 +1424,18 @@ impl ServerInfo {
 
     /// Collects storage information by parsing 'lsblk' output.
     fn collect_storage_info() -> Result<StorageInfo, Box<dyn Error>> {
-        let output = Command::new("lsblk")
+        let output = match Command::new("lsblk")
             .args(&["-J", "-o", "NAME,TYPE,SIZE,MODEL"])
-            .output()?;
+            .output()
+        {
+            Ok(output) => output,
+            Err(_) => {
+                // lsblk not available, return empty storage info
+                return Ok(StorageInfo {
+                    devices: Vec::new(),
+                });
+            }
+        };
 
         let json: serde_json::Value = serde_json::from_slice(&output.stdout)?;
         let mut devices = Vec::new();
@@ -1277,7 +1499,16 @@ impl ServerInfo {
     /// Collects network information, including Infiniband if available.
     fn collect_network_info() -> Result<NetworkInfo, Box<dyn Error>> {
         let mut interfaces = Vec::new();
-        let output = Command::new("ip").args(&["-j", "addr", "show"]).output()?;
+        let output = match Command::new("ip").args(&["-j", "addr", "show"]).output() {
+            Ok(output) => output,
+            Err(_) => {
+                // ip command not available, return empty network info
+                return Ok(NetworkInfo {
+                    interfaces: Vec::new(),
+                    infiniband: None,
+                });
+            }
+        };
         let json: serde_json::Value = serde_json::from_slice(&output.stdout)?;
 
         if let Some(ifaces) = json.as_array() {
@@ -1320,16 +1551,21 @@ impl ServerInfo {
                         }
                     }
 
-                    // Get speed using ethtool
-                    let speed = match Command::new("ethtool").arg(name).output() {
-                        Ok(output) => {
-                            let output_str = String::from_utf8(output.stdout)?;
-                            NETWORK_SPEED_RE
-                                .captures(&output_str)
-                                .map(|cap| cap[1].to_string())
-                        }
-                        Err(_) => None,
-                    };
+                    // Get speed using ethtool if available
+                    let speed =
+                        Command::new("ethtool")
+                            .arg(name)
+                            .output()
+                            .ok()
+                            .and_then(|output| {
+                                String::from_utf8(output.stdout)
+                                    .ok()
+                                    .and_then(|output_str| {
+                                        NETWORK_SPEED_RE
+                                            .captures(&output_str)
+                                            .map(|cap| cap[1].to_string())
+                                    })
+                            });
 
                     interfaces.push(NetworkInterface {
                         name: name.to_string(),
