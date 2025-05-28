@@ -60,8 +60,11 @@
           inherit nativeBuildInputs buildInputs;
           
           # Speed up builds in CI
-          CARGO_BUILD_JOBS = "8";
+          CARGO_BUILD_JOBS = "4";  # Reduce parallelism to avoid OOM
           CARGO_INCREMENTAL = "0";  # Disable incremental compilation in CI
+          # Use less memory during linking
+          CARGO_PROFILE_RELEASE_LTO = "thin";
+          CARGO_PROFILE_RELEASE_CODEGEN_UNITS = "16";
           
           meta = with pkgs.lib; {
             description = "A tool for generating hardware information reports";

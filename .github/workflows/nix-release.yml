@@ -61,13 +61,10 @@ jobs:
             echo "upload_url=${{ steps.create_release.outputs.upload_url }}" >> $GITHUB_OUTPUT
           fi
 
-  build-with-nix:
+  build-linux:
     needs: create-release
     timeout-minutes: 60  # Increase timeout for Rust builds
-    strategy:
-      matrix:
-        os: [ubuntu-latest, macos-latest]
-    runs-on: ${{ matrix.os }}
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       
@@ -82,12 +79,12 @@ jobs:
           echo "Starting build at $(date)"
           nix build .#default --print-build-logs
           echo "Build completed at $(date)"
-          cp -L result/bin/hardware_report hardware_report-${{ matrix.os == 'ubuntu-latest' && 'linux-x86_64' || 'darwin-x86_64' }}
+          cp -L result/bin/hardware_report hardware_report-linux-x86_64
       
       - name: Create tarball
         run: |
-          tar czf hardware_report-${{ matrix.os == 'ubuntu-latest' && 'linux-x86_64' || 'darwin-x86_64' }}-${{ needs.create-release.outputs.version }}.tar.gz hardware_report-${{ matrix.os == 'ubuntu-latest' && 'linux-x86_64' || 'darwin-x86_64' }}
-          sha256sum hardware_report-${{ matrix.os == 'ubuntu-latest' && 'linux-x86_64' || 'darwin-x86_64' }}-${{ needs.create-release.outputs.version }}.tar.gz > hardware_report-${{ matrix.os == 'ubuntu-latest' && 'linux-x86_64' || 'darwin-x86_64' }}-${{ needs.create-release.outputs.version }}.tar.gz.sha256
+          tar czf hardware_report-linux-x86_64-${{ needs.create-release.outputs.version }}.tar.gz hardware_report-linux-x86_64
+          sha256sum hardware_report-linux-x86_64-${{ needs.create-release.outputs.version }}.tar.gz > hardware_report-linux-x86_64-${{ needs.create-release.outputs.version }}.tar.gz.sha256
       
       - name: Upload Release Binary
         uses: actions/upload-release-asset@v1
@@ -95,8 +92,8 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ needs.create-release.outputs.upload_url }}
-          asset_path: hardware_report-${{ matrix.os == 'ubuntu-latest' && 'linux-x86_64' || 'darwin-x86_64' }}-${{ needs.create-release.outputs.version }}.tar.gz
-          asset_name: hardware_report-${{ matrix.os == 'ubuntu-latest' && 'linux-x86_64' || 'darwin-x86_64' }}-${{ needs.create-release.outputs.version }}.tar.gz
+          asset_path: hardware_report-linux-x86_64-${{ needs.create-release.outputs.version }}.tar.gz
+          asset_name: hardware_report-linux-x86_64-${{ needs.create-release.outputs.version }}.tar.gz
           asset_content_type: application/gzip
       
       - name: Upload SHA256
@@ -105,13 +102,58 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ needs.create-release.outputs.upload_url }}
-          asset_path: hardware_report-${{ matrix.os == 'ubuntu-latest' && 'linux-x86_64' || 'darwin-x86_64' }}-${{ needs.create-release.outputs.version }}.tar.gz.sha256
-          asset_name: hardware_report-${{ matrix.os == 'ubuntu-latest' && 'linux-x86_64' || 'darwin-x86_64' }}-${{ needs.create-release.outputs.version }}.tar.gz.sha256
+          asset_path: hardware_report-linux-x86_64-${{ needs.create-release.outputs.version }}.tar.gz.sha256
+          asset_name: hardware_report-linux-x86_64-${{ needs.create-release.outputs.version }}.tar.gz.sha256
+          asset_content_type: text/plain
+
+  build-macos:
+    needs: [create-release, build-linux]  # Run after Linux to avoid concurrent builds
+    timeout-minutes: 60
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Install Nix
+        uses: cachix/install-nix-action@v24
+        with:
+          extra_nix_config: |
+            experimental-features = nix-command flakes
+      
+      - name: Build binary package
+        run: |
+          echo "Starting build at $(date)"
+          nix build .#default --print-build-logs
+          echo "Build completed at $(date)"
+          cp -L result/bin/hardware_report hardware_report-darwin-x86_64
+      
+      - name: Create tarball
+        run: |
+          tar czf hardware_report-darwin-x86_64-${{ needs.create-release.outputs.version }}.tar.gz hardware_report-darwin-x86_64
+          shasum -a 256 hardware_report-darwin-x86_64-${{ needs.create-release.outputs.version }}.tar.gz > hardware_report-darwin-x86_64-${{ needs.create-release.outputs.version }}.tar.gz.sha256
+      
+      - name: Upload Release Binary
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ needs.create-release.outputs.upload_url }}
+          asset_path: hardware_report-darwin-x86_64-${{ needs.create-release.outputs.version }}.tar.gz
+          asset_name: hardware_report-darwin-x86_64-${{ needs.create-release.outputs.version }}.tar.gz
+          asset_content_type: application/gzip
+      
+      - name: Upload SHA256
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ needs.create-release.outputs.upload_url }}
+          asset_path: hardware_report-darwin-x86_64-${{ needs.create-release.outputs.version }}.tar.gz.sha256
+          asset_name: hardware_report-darwin-x86_64-${{ needs.create-release.outputs.version }}.tar.gz.sha256
           asset_content_type: text/plain
 
   build-debian-package:
-    needs: create-release
-    timeout-minutes: 45  # Increase timeout for Rust builds
+    needs: [create-release, build-linux]  # Run after Linux build
+    timeout-minutes: 45
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -152,8 +194,8 @@ jobs:
           asset_content_type: text/plain
 
   build-docker:
-    needs: create-release
-    timeout-minutes: 45  # Increase timeout for Rust builds
+    needs: [create-release, build-debian-package]  # Run after Debian build
+    timeout-minutes: 45
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
