@@ -273,6 +273,18 @@ EOF
             
             buildPhase = ''
               export HOME=$TMPDIR
+              # Link vendor directory
+              ln -s $cargoDeps vendor
+              # Configure cargo to use vendored deps
+              mkdir -p .cargo
+              cat > .cargo/config.toml << EOF
+              [source.crates-io]
+              replace-with = "vendored-sources"
+              
+              [source.vendored-sources]
+              directory = "vendor"
+              EOF
+              
               ${rustToolchain}/bin/cargo test --release --offline
             '';
             
@@ -310,6 +322,18 @@ EOF
             
             buildPhase = ''
               export HOME=$TMPDIR
+              # Link vendor directory
+              ln -s $cargoDeps vendor
+              # Configure cargo to use vendored deps
+              mkdir -p .cargo
+              cat > .cargo/config.toml << EOF
+              [source.crates-io]
+              replace-with = "vendored-sources"
+              
+              [source.vendored-sources]
+              directory = "vendor"
+              EOF
+              
               ${rustToolchain}/bin/cargo clippy --all-targets --offline -- -D warnings
             '';
             

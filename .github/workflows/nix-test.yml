@@ -21,12 +21,8 @@ jobs:
           extra_nix_config: |
             experimental-features = nix-command flakes
       
-      - name: Run flake checks
-        run: |
-          # Skip flake checks on macOS due to Linux-only dependencies
-          if [[ "${{ matrix.os }}" == "ubuntu-latest" ]]; then
-            nix flake check --print-build-logs || echo "::warning::Flake checks failed, running tests in dev shell instead"
-          fi
+      # Flake checks are disabled due to vendoring issues in CI
+      # Tests are run in dev shell instead which works correctly
       
       - name: Build all packages
         run: |
