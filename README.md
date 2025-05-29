@@ -77,6 +77,21 @@ echo "Build complete! Run with: sudo ./result/bin/hardware_report" && \
 sudo ./result/bin/hardware_report
 ```
 
+
+**Interactive Development with Nix (One-Liner Setup)**
+
+
+```bash
+# Install Nix, activate it, clone the repo, enter the dev shell, and build
+curl --proto '=https' --tlsv1.2 -sSf https://install.determinate.systems/nix | sh -s -- install && \
+. /nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh && \
+git clone https://github.com/sfcompute/hardware_report.git && \
+cd hardware_report && \
+nix develop && \
+cargo build --release && \
+sudo ./target/release/hardware_report
+```
+
 **Production Deployment (Debian Package with Nix)**
 ```bash
 # Build and install system-wide package:
