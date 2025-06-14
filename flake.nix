@@ -42,6 +42,7 @@
           ethtool
           util-linux  # for lscpu
           pciutils    # for lspci
+          dmidecode   # for system/BIOS/memory information
         ];
         
         hardware_report_unwrapped = pkgs.rustPlatform.buildRustPackage {
@@ -108,7 +109,7 @@ Maintainer: Kenny Sheridan <kenny@sfcompute.com>
 Description: Hardware information collection tool
  A tool for generating detailed hardware information reports from Linux servers,
  outputting the data in TOML format for infrastructure standardization.
-Depends: numactl, ipmitool, ethtool, util-linux, pciutils
+Depends: numactl, ipmitool, ethtool, util-linux, pciutils, dmidecode
 Priority: optional
 Section: utils
 EOF
@@ -255,7 +256,7 @@ EOF
             echo "Run 'cargo run' to run the project"
             echo ""
             echo "Runtime dependencies are available in PATH:"
-            echo "- numactl, ipmitool, ethtool, lscpu, lspci"
+            echo "- numactl, ipmitool, ethtool, lscpu, lspci, dmidecode"
           '';
         };
         
