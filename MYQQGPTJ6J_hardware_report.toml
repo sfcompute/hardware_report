@@ -1,0 +1,140 @@
+hostname = "Kennys-MacBook-Pro.local"
+fqdn = "Kennys-MacBook-Pro.local"
+os_ip = []
+
+[summary]
+total_memory = "64.0G"
+memory_config = "Unknown @ Unknown"
+total_storage = "6.0 TB"
+total_storage_tb = 0.0
+filesystems = []
+total_gpus = 4
+total_nics = 0
+cpu_summary = "Apple M4 Max (1 Socket, 16 Cores/Socket, 1 Thread/Core, 1 NUMA Node)"
+
+[summary.system_info]
+uuid = "53040FFD-5BCE-5B29-A887-2B7EEA02A0EE"
+serial = "MYQQGPTJ6J"
+product_name = "MacBook Pro (Apple M4 Max)"
+product_manufacturer = "Apple Inc."
+
+[summary.bios]
+vendor = "Apple Inc."
+version = "11881.121.1"
+release_date = "N/A"
+firmware_version = "11881.121.1"
+
+[summary.chassis]
+manufacturer = "Apple Inc."
+type_ = "Laptop"
+serial = "MYQQGPTJ6J"
+
+[summary.motherboard]
+manufacturer = "Unknown Manufacturer"
+product_name = "Unknown Product"
+version = "Unknown Version"
+serial = "Unknown S/N"
+features = "Unknown"
+location = "Unknown"
+type_ = "Unknown"
+
+[summary.numa_topology]
+
+[summary.cpu_topology]
+total_cores = 16
+total_threads = 16
+sockets = 1
+cores_per_socket = 16
+threads_per_core = 1
+numa_nodes = 1
+cpu_model = "Apple M4 Max"
+
+[hardware.cpu]
+model = "Apple M4 Max"
+cores = 16
+threads = 1
+sockets = 1
+speed = "Unknown"
+
+[hardware.memory]
+total = "64.0G"
+type_ = "Unknown"
+speed = "Unknown"
+modules = []
+
+[[hardware.storage.devices]]
+name = "Storage"
+type_ = "disk"
+size = "Unknown"
+model = "Storage"
+
+[[hardware.storage.devices]]
+name = "Data"
+type_ = "disk"
+size = "2 TB (1,995,218,165,760 bytes)"
+model = "Data"
+
+[[hardware.storage.devices]]
+name = "Physical Drive"
+type_ = "disk"
+size = "Unknown"
+model = "Physical Drive"
+
+[[hardware.storage.devices]]
+name = "Nix Store"
+type_ = "disk"
+size = "2 TB (1,995,218,165,760 bytes)"
+model = "Nix Store"
+
+[[hardware.storage.devices]]
+name = "Physical Drive"
+type_ = "disk"
+size = "Unknown"
+model = "Physical Drive"
+
+[[hardware.storage.devices]]
+name = "Macintosh HD"
+type_ = "disk"
+size = "2 TB (1,995,218,165,760 bytes)"
+model = "Macintosh HD"
+
+[[hardware.storage.devices]]
+name = "Physical Drive"
+type_ = "disk"
+size = "Unknown"
+model = "Physical Drive"
+
+[[hardware.gpus.devices]]
+index = 0
+name = "Graphics/Displays"
+uuid = "macOS-GPU-0"
+memory = "Unknown"
+pci_id = "Unknown"
+vendor = "Apple"
+
+[[hardware.gpus.devices]]
+index = 1
+name = "Apple M4 Max"
+uuid = "macOS-GPU-1"
+memory = "Unknown"
+pci_id = "Unknown"
+vendor = "Apple (0x106b)"
+
+[[hardware.gpus.devices]]
+index = 2
+name = "Displays"
+uuid = "macOS-GPU-2"
+memory = "Unknown"
+pci_id = "Unknown"
+vendor = "Apple"
+
+[[hardware.gpus.devices]]
+index = 3
+name = "Color LCD"
+uuid = "macOS-GPU-3"
+memory = "Unknown"
+pci_id = "Unknown"
+vendor = "Apple"
+
+[network]
+interfaces = []

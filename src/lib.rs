@@ -887,6 +887,12 @@ impl ServerInfo {
                 serial = trimmed.split(":").nth(1).unwrap_or("Unknown").trim().to_string();
             } else if trimmed.starts_with("Model Name:") {
                 model = trimmed.split(":").nth(1).unwrap_or("Mac").trim().to_string();
+            } else if trimmed.starts_with("Chip:") {
+                // Also extract chip info for newer Macs that don't show "Processor Name:"
+                let chip_name = trimmed.split(":").nth(1).unwrap_or("Unknown").trim().to_string();
+                if !chip_name.is_empty() && chip_name != "Unknown" {
+                    model = format!("{} ({})", model, chip_name);
+                }
             }
         }
 
@@ -1073,8 +1079,53 @@ impl ServerInfo {
         Ok(filesystems)
     }
 
-    /// Gets BIOS information using dmidecode with minimal output
+    /// Gets BIOS information using platform-specific commands
     fn get_bios_info() -> Result<BiosInfo, Box<dyn Error>> {
+        if cfg!(target_os = "macos") {
+            Self::get_bios_info_macos()
+        } else {
+            Self::get_bios_info_linux()
+        }
+    }
+
+    /// Gets firmware information on macOS using system_profiler
+    fn get_bios_info_macos() -> Result<BiosInfo, Box<dyn Error>> {
+        let output = match Command::new("system_profiler")
+            .args(&["SPHardwareDataType", "-detailLevel", "basic"])
+            .output()
+        {
+            Ok(output) => output,
+            Err(_) => {
+                return Ok(BiosInfo {
+                    vendor: "Apple Inc.".to_string(),
+                    version: "Unknown Version".to_string(),
+                    release_date: "Unknown Date".to_string(),
+                    firmware_version: "N/A".to_string(),
+                });
+            }
+        };
+
+        let output_str = String::from_utf8_lossy(&output.stdout);
+        let mut firmware_version = "N/A".to_string();
+
+        for line in output_str.lines() {
+            let trimmed = line.trim();
+            if trimmed.starts_with("System Firmware Version:") {
+                firmware_version = trimmed.split(":").nth(1).unwrap_or("N/A").trim().to_string();
+                break;
+            }
+        }
+
+        Ok(BiosInfo {
+            vendor: "Apple Inc.".to_string(),
+            version: firmware_version.clone(),
+            release_date: "N/A".to_string(),
+            firmware_version,
+        })
+    }
+
+    /// Gets BIOS information using dmidecode on Linux
+    fn get_bios_info_linux() -> Result<BiosInfo, Box<dyn Error>> {
         // Try without sudo first, then with sudo if needed
         let output = match Command::new("dmidecode").args(&["-t", "0"]).output() {
             Ok(out) => {
@@ -1114,8 +1165,62 @@ impl ServerInfo {
         })
     }
 
-    /// Gets chassis information using dmidecode with minimal output
+    /// Gets chassis information using platform-specific commands
     fn get_chassis_info() -> Result<ChassisInfo, Box<dyn Error>> {
+        if cfg!(target_os = "macos") {
+            Self::get_chassis_info_macos()
+        } else {
+            Self::get_chassis_info_linux()
+        }
+    }
+
+    /// Gets chassis information on macOS using system_profiler
+    fn get_chassis_info_macos() -> Result<ChassisInfo, Box<dyn Error>> {
+        let output = match Command::new("system_profiler")
+            .args(&["SPHardwareDataType", "-detailLevel", "basic"])
+            .output()
+        {
+            Ok(output) => output,
+            Err(_) => {
+                return Ok(ChassisInfo {
+                    manufacturer: "Apple Inc.".to_string(),
+                    type_: "Laptop".to_string(),
+                    serial: "Unknown S/N".to_string(),
+                });
+            }
+        };
+
+        let output_str = String::from_utf8_lossy(&output.stdout);
+        let mut serial = "Unknown S/N".to_string();
+        let mut chassis_type = "Laptop".to_string();
+
+        for line in output_str.lines() {
+            let trimmed = line.trim();
+            if trimmed.starts_with("Serial Number (system):") {
+                serial = trimmed.split(":").nth(1).unwrap_or("Unknown S/N").trim().to_string();
+            } else if trimmed.starts_with("Model Name:") {
+                let model = trimmed.split(":").nth(1).unwrap_or("").trim().to_string();
+                if model.contains("Mac Pro") || model.contains("Mac Studio") || model.contains("iMac Pro") {
+                    chassis_type = "Desktop".to_string();
+                } else if model.contains("iMac") {
+                    chassis_type = "All-in-One".to_string();
+                } else if model.contains("MacBook") {
+                    chassis_type = "Laptop".to_string();
+                } else if model.contains("Mac mini") {
+                    chassis_type = "Mini PC".to_string();
+                }
+            }
+        }
+
+        Ok(ChassisInfo {
+            manufacturer: "Apple Inc.".to_string(),
+            type_: chassis_type,
+            serial,
+        })
+    }
+
+    /// Gets chassis information using dmidecode on Linux
+    fn get_chassis_info_linux() -> Result<ChassisInfo, Box<dyn Error>> {
         let output = match Command::new("dmidecode").args(&["-t", "3"]).output() {
             Ok(out) => {
                 if !out.status.success() {
@@ -1202,7 +1307,7 @@ impl ServerInfo {
         {
             let output_str = String::from_utf8_lossy(&output.stdout);
             for line in output_str.lines() {
-                if line.trim().starts_with("Processor Name:") {
+                if line.trim().starts_with("Processor Name:") || line.trim().starts_with("Chip:") {
                     cpu_model = line.split(":").nth(1).unwrap_or("Unknown").trim().to_string();
                     break;
                 }
@@ -1455,7 +1560,7 @@ impl ServerInfo {
                 let output_str = String::from_utf8(output.stdout)?;
                 // Extract processor name from system_profiler output
                 for line in output_str.lines() {
-                    if line.trim().starts_with("Processor Name:") {
+                    if line.trim().starts_with("Processor Name:") || line.trim().starts_with("Chip:") {
                         let cpu_name = line.split(":").nth(1).unwrap_or("Unknown").trim().to_string();
                         return Ok(CpuInfo {
                             model: cpu_name,

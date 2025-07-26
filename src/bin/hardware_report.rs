@@ -139,25 +139,41 @@ async fn main() -> Result<(), Box<dyn Error>> {
             .join(" + ");
         println!("Available Disks: {}", total_storage);
 
-        // Get BIOS information from dmidecode
-        let output = Command::new("dmidecode").args(["-t", "bios"]).output()?;
-        let bios_str = String::from_utf8(output.stdout)?;
-        println!(
-            "BIOS: {} {} ({})",
-            ServerInfo::extract_dmidecode_value(&bios_str, "Vendor")?,
-            ServerInfo::extract_dmidecode_value(&bios_str, "Version")?,
-            ServerInfo::extract_dmidecode_value(&bios_str, "Release Date")?
-        );
+        // Get BIOS/Firmware information (platform-specific)
+        if cfg!(target_os = "macos") {
+            println!(
+                "BIOS: {} {} ({})",
+                server_info.summary.bios.vendor,
+                server_info.summary.bios.version,
+                server_info.summary.bios.release_date
+            );
+            println!(
+                "Chassis: {} {} (S/N: {})",
+                server_info.summary.chassis.manufacturer,
+                server_info.summary.chassis.type_,
+                server_info.summary.chassis.serial
+            );
+        } else {
+            // Linux - use dmidecode
+            let output = Command::new("dmidecode").args(["-t", "bios"]).output()?;
+            let bios_str = String::from_utf8(output.stdout)?;
+            println!(
+                "BIOS: {} {} ({})",
+                ServerInfo::extract_dmidecode_value(&bios_str, "Vendor")?,
+                ServerInfo::extract_dmidecode_value(&bios_str, "Version")?,
+                ServerInfo::extract_dmidecode_value(&bios_str, "Release Date")?
+            );
 
-        // Get chassis information from dmidecode
-        let output = Command::new("dmidecode").args(["-t", "chassis"]).output()?;
-        let chassis_str = String::from_utf8(output.stdout)?;
-        println!(
-            "Chassis: {} {} (S/N: {})",
-            ServerInfo::extract_dmidecode_value(&chassis_str, "Manufacturer")?,
-            ServerInfo::extract_dmidecode_value(&chassis_str, "Type")?,
-            ServerInfo::extract_dmidecode_value(&chassis_str, "Serial Number")?
-        );
+            // Get chassis information from dmidecode
+            let output = Command::new("dmidecode").args(["-t", "chassis"]).output()?;
+            let chassis_str = String::from_utf8(output.stdout)?;
+            println!(
+                "Chassis: {} {} (S/N: {})",
+                ServerInfo::extract_dmidecode_value(&chassis_str, "Manufacturer")?,
+                ServerInfo::extract_dmidecode_value(&chassis_str, "Type")?,
+                ServerInfo::extract_dmidecode_value(&chassis_str, "Serial Number")?
+            );
+        }
 
         // Get motherboard information from server_info
         println!(
