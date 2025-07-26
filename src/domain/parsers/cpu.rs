@@ -149,7 +149,10 @@ pub fn parse_macos_cpu_info(system_profiler_output: &str) -> Result<CpuInfo, Str
         } else if trimmed.starts_with("Total Number of Cores:") {
             let core_str = trimmed.split(':').nth(1)
                 .unwrap_or("1")
-                .trim();
+                .trim()
+                .split_whitespace()
+                .next()
+                .unwrap_or("1");
             cores = core_str.parse::<u32>().unwrap_or(1);
         } else if trimmed.starts_with("Processor Speed:") {
             speed = trimmed.split(':').nth(1)
