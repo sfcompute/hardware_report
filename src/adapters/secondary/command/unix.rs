@@ -50,7 +50,7 @@ impl UnixCommandExecutor {
     }
 
     /// Create a Unix command executor with default settings
-    pub fn default() -> Self {
+    pub fn with_defaults() -> Self {
         Self::new(Duration::from_secs(30), 2, false)
     }
 
@@ -132,9 +132,9 @@ impl UnixCommandExecutor {
                 let exit_code = output.status.code();
 
                 if self.verbose && !success {
-                    eprintln!("Command failed with exit code: {:?}", exit_code);
+                    eprintln!("Command failed with exit code: {exit_code:?}");
                     if !stderr.is_empty() {
-                        eprintln!("stderr: {}", stderr);
+                        eprintln!("stderr: {stderr}");
                     }
                 }
 

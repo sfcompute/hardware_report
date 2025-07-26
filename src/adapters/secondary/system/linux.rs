@@ -350,7 +350,7 @@ impl SystemInfoProvider for LinuxSystemInfoProvider {
                 stderr: e.to_string(),
             })?;
 
-        parse_hostname_output(&hostname_output.stdout).map_err(|e| SystemError::ParseError(e))
+        parse_hostname_output(&hostname_output.stdout).map_err(SystemError::ParseError)
     }
 
     async fn get_fqdn(&self) -> Result<String, SystemError> {
@@ -367,7 +367,7 @@ impl SystemInfoProvider for LinuxSystemInfoProvider {
                 stderr: e.to_string(),
             })?;
 
-        parse_hostname_output(&hostname_output.stdout).map_err(|e| SystemError::ParseError(e))
+        parse_hostname_output(&hostname_output.stdout).map_err(SystemError::ParseError)
     }
 
     async fn get_filesystems(&self) -> Result<Vec<String>, SystemError> {

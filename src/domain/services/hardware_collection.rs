@@ -35,6 +35,7 @@ pub struct HardwareCollectionService {
     /// Data publisher for remote endpoints
     data_publisher: Arc<dyn DataPublisher>,
     /// Configuration provider
+    #[allow(dead_code)]
     config_provider: Arc<dyn ConfigurationProvider>,
 }
 

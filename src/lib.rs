@@ -511,7 +511,7 @@ impl ServerInfo {
     }
 
     fn get_motherboard_info_macos() -> Result<MotherboardInfo, Box<dyn Error>> {
-        let mut manufacturer = "Apple Inc.".to_string();
+        let manufacturer = "Apple Inc.".to_string();
         let mut product_name = "Unknown Product".to_string();
         let mut version = "Unknown Version".to_string();
         let mut serial = "Unknown S/N".to_string();

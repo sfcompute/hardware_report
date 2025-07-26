@@ -68,7 +68,7 @@ impl SystemInfoProvider for MacOSSystemInfoProvider {
                 stderr: e.to_string(),
             })?;
 
-        parse_macos_cpu_info(&output.stdout).map_err(|e| SystemError::ParseError(e))
+        parse_macos_cpu_info(&output.stdout).map_err(SystemError::ParseError)
     }
 
     async fn get_memory_info(&self) -> Result<MemoryInfo, SystemError> {
@@ -85,7 +85,7 @@ impl SystemInfoProvider for MacOSSystemInfoProvider {
                 stderr: e.to_string(),
             })?;
 
-        parse_macos_memory_info(&output.stdout).map_err(|e| SystemError::ParseError(e))
+        parse_macos_memory_info(&output.stdout).map_err(SystemError::ParseError)
     }
 
     async fn get_storage_info(&self) -> Result<StorageInfo, SystemError> {
@@ -103,7 +103,7 @@ impl SystemInfoProvider for MacOSSystemInfoProvider {
             })?;
 
         let devices =
-            parse_macos_storage_info(&output.stdout).map_err(|e| SystemError::ParseError(e))?;
+            parse_macos_storage_info(&output.stdout).map_err(SystemError::ParseError)?;
 
         Ok(StorageInfo { devices })
     }
@@ -156,9 +156,9 @@ impl SystemInfoProvider for MacOSSystemInfoProvider {
 
                     devices.push(crate::domain::GpuDevice {
                         index: gpu_index,
-                        name: format!("Apple {} (Metal 3)", trimmed),
-                        uuid: format!("macOS-GPU-{}", gpu_index),
-                        memory: format!("Unified Memory ({} GPU cores)", memory_cores),
+                        name: format!("Apple {trimmed} (Metal 3)"),
+                        uuid: format!("macOS-GPU-{gpu_index}"),
+                        memory: format!("Unified Memory ({memory_cores} GPU cores)"),
                         pci_id: "Apple Fabric (Integrated)".to_string(),
                         vendor: "Apple".to_string(),
                         numa_node: None,
@@ -197,7 +197,7 @@ impl SystemInfoProvider for MacOSSystemInfoProvider {
             })?;
 
         let interfaces =
-            parse_macos_network_info(&output.stdout).map_err(|e| SystemError::ParseError(e))?;
+            parse_macos_network_info(&output.stdout).map_err(SystemError::ParseError)?;
 
         Ok(NetworkInfo {
             interfaces,
@@ -220,7 +220,7 @@ impl SystemInfoProvider for MacOSSystemInfoProvider {
                 stderr: e.to_string(),
             })?;
 
-        let mut vendor = "Apple Inc.".to_string();
+        let vendor = "Apple Inc.".to_string();
         let mut version = "Unknown".to_string();
         let mut release_date = "Unknown".to_string();
 
@@ -265,7 +265,7 @@ impl SystemInfoProvider for MacOSSystemInfoProvider {
                 stderr: e.to_string(),
             })?;
 
-        let mut manufacturer = "Apple Inc.".to_string();
+        let manufacturer = "Apple Inc.".to_string();
         let mut type_ = "Laptop".to_string();
         let mut serial = "Unknown".to_string();
 
@@ -310,7 +310,7 @@ impl SystemInfoProvider for MacOSSystemInfoProvider {
                 stderr: e.to_string(),
             })?;
 
-        let mut manufacturer = "Apple Inc.".to_string();
+        let manufacturer = "Apple Inc.".to_string();
         let mut product_name = "Unknown Product".to_string();
         let mut version = "Unknown Version".to_string();
         let mut serial = "Unknown S/N".to_string();
@@ -369,7 +369,7 @@ impl SystemInfoProvider for MacOSSystemInfoProvider {
         let mut uuid = "Unknown".to_string();
         let mut serial = "Unknown".to_string();
         let mut product_name = "Unknown".to_string();
-        let mut manufacturer = "Apple Inc.".to_string();
+        let manufacturer = "Apple Inc.".to_string();
 
         for line in output.stdout.lines() {
             let trimmed = line.trim();
@@ -397,7 +397,7 @@ impl SystemInfoProvider for MacOSSystemInfoProvider {
                     .unwrap_or("")
                     .trim();
                 product_name = if !chip.is_empty() {
-                    format!("{} ({})", model, chip)
+                    format!("{model} ({chip})")
                 } else {
                     model.to_string()
                 };
@@ -429,7 +429,7 @@ impl SystemInfoProvider for MacOSSystemInfoProvider {
                 stderr: e.to_string(),
             })?;
 
-        parse_hostname_output(&hostname_output.stdout).map_err(|e| SystemError::ParseError(e))
+        parse_hostname_output(&hostname_output.stdout).map_err(SystemError::ParseError)
     }
 
     async fn get_fqdn(&self) -> Result<String, SystemError> {
@@ -445,7 +445,7 @@ impl SystemInfoProvider for MacOSSystemInfoProvider {
                 stderr: e.to_string(),
             })?;
 
-        parse_hostname_output(&hostname_output.stdout).map_err(|e| SystemError::ParseError(e))
+        parse_hostname_output(&hostname_output.stdout).map_err(SystemError::ParseError)
     }
 
     async fn get_filesystems(&self) -> Result<Vec<String>, SystemError> {

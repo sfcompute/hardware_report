@@ -26,6 +26,7 @@ use std::time::Duration;
 /// HTTP data publisher that sends reports to remote endpoints
 pub struct HttpDataPublisher {
     client: Client,
+    #[allow(dead_code)]
     timeout: Duration,
 }
 
@@ -41,14 +42,14 @@ impl HttpDataPublisher {
             .danger_accept_invalid_certs(skip_tls_verify)
             .build()
             .map_err(|e| {
-                PublishError::NetworkFailed(format!("Failed to create HTTP client: {}", e))
+                PublishError::NetworkFailed(format!("Failed to create HTTP client: {e}"))
             })?;
 
         Ok(Self { client, timeout })
     }
 
     /// Create with default settings
-    pub fn default() -> Result<Self, PublishError> {
+    pub fn with_defaults() -> Result<Self, PublishError> {
         Self::new(Duration::from_secs(30), false)
     }
 
@@ -89,7 +90,7 @@ impl DataPublisher for HttpDataPublisher {
 
         // Add authentication if provided
         if let Some(ref token) = config.auth_token {
-            request = request.header("Authorization", format!("Bearer {}", token));
+            request = request.header("Authorization", format!("Bearer {token}"));
         }
 
         // Add content type
@@ -99,7 +100,7 @@ impl DataPublisher for HttpDataPublisher {
         let response = request
             .send()
             .await
-            .map_err(|e| PublishError::NetworkFailed(format!("Failed to send request: {}", e)))?;
+            .map_err(|e| PublishError::NetworkFailed(format!("Failed to send request: {e}")))?;
 
         // Check response status
         if response.status().is_success() {
@@ -113,13 +114,11 @@ impl DataPublisher for HttpDataPublisher {
 
             if status.as_u16() == 401 || status.as_u16() == 403 {
                 Err(PublishError::AuthenticationFailed(format!(
-                    "HTTP {}: {}",
-                    status, error_text
+                    "HTTP {status}: {error_text}"
                 )))
             } else {
                 Err(PublishError::NetworkFailed(format!(
-                    "HTTP {}: {}",
-                    status, error_text
+                    "HTTP {status}: {error_text}"
                 )))
             }
         }
@@ -135,7 +134,7 @@ impl DataPublisher for HttpDataPublisher {
 
         // Add authentication if provided
         if let Some(ref token) = config.auth_token {
-            request = request.header("Authorization", format!("Bearer {}", token));
+            request = request.header("Authorization", format!("Bearer {token}"));
         }
 
         match request.send().await {

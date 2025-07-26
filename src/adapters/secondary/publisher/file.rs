@@ -42,18 +42,18 @@ impl Default for FileSystemRepository {
 impl FileRepository for FileSystemRepository {
     async fn save_json(&self, report: &HardwareReport, path: &Path) -> Result<(), PublishError> {
         let json_string = serde_json::to_string_pretty(report).map_err(|e| {
-            PublishError::SerializationFailed(format!("JSON serialization failed: {}", e))
+            PublishError::SerializationFailed(format!("JSON serialization failed: {e}"))
         })?;
 
         // Ensure parent directory exists
         if let Some(parent) = path.parent() {
             fs::create_dir_all(parent).await.map_err(|e| {
-                PublishError::NetworkFailed(format!("Failed to create directory: {}", e))
+                PublishError::NetworkFailed(format!("Failed to create directory: {e}"))
             })?;
         }
 
         fs::write(path, json_string).await.map_err(|e| {
-            PublishError::NetworkFailed(format!("Failed to write JSON file: {}", e))
+            PublishError::NetworkFailed(format!("Failed to write JSON file: {e}"))
         })?;
 
         Ok(())
@@ -61,18 +61,18 @@ impl FileRepository for FileSystemRepository {
 
     async fn save_toml(&self, report: &HardwareReport, path: &Path) -> Result<(), PublishError> {
         let toml_string = toml::to_string_pretty(report).map_err(|e| {
-            PublishError::SerializationFailed(format!("TOML serialization failed: {}", e))
+            PublishError::SerializationFailed(format!("TOML serialization failed: {e}"))
         })?;
 
         // Ensure parent directory exists
         if let Some(parent) = path.parent() {
             fs::create_dir_all(parent).await.map_err(|e| {
-                PublishError::NetworkFailed(format!("Failed to create directory: {}", e))
+                PublishError::NetworkFailed(format!("Failed to create directory: {e}"))
             })?;
         }
 
         fs::write(path, toml_string).await.map_err(|e| {
-            PublishError::NetworkFailed(format!("Failed to write TOML file: {}", e))
+            PublishError::NetworkFailed(format!("Failed to write TOML file: {e}"))
         })?;
 
         Ok(())
@@ -81,20 +81,20 @@ impl FileRepository for FileSystemRepository {
     async fn load_json(&self, path: &Path) -> Result<HardwareReport, PublishError> {
         let json_string = fs::read_to_string(path)
             .await
-            .map_err(|e| PublishError::NetworkFailed(format!("Failed to read JSON file: {}", e)))?;
+            .map_err(|e| PublishError::NetworkFailed(format!("Failed to read JSON file: {e}")))?;
 
         serde_json::from_str(&json_string).map_err(|e| {
-            PublishError::SerializationFailed(format!("JSON deserialization failed: {}", e))
+            PublishError::SerializationFailed(format!("JSON deserialization failed: {e}"))
         })
     }
 
     async fn load_toml(&self, path: &Path) -> Result<HardwareReport, PublishError> {
         let toml_string = fs::read_to_string(path)
             .await
-            .map_err(|e| PublishError::NetworkFailed(format!("Failed to read TOML file: {}", e)))?;
+            .map_err(|e| PublishError::NetworkFailed(format!("Failed to read TOML file: {e}")))?;
 
         toml::from_str(&toml_string).map_err(|e| {
-            PublishError::SerializationFailed(format!("TOML deserialization failed: {}", e))
+            PublishError::SerializationFailed(format!("TOML deserialization failed: {e}"))
         })
     }
 
@@ -130,8 +130,8 @@ impl FileDataPublisher {
         report: &HardwareReport,
         base_path: &str,
     ) -> Result<(String, String), PublishError> {
-        let json_path = format!("{}.json", base_path);
-        let toml_path = format!("{}.toml", base_path);
+        let json_path = format!("{base_path}.json");
+        let toml_path = format!("{base_path}.toml");
 
         // Save both formats
         let json_result = self.repository.save_json(report, Path::new(&json_path));
