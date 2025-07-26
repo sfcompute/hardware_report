@@ -605,6 +605,7 @@ name = "hardware_report"
 version = "0.1.7"
 dependencies = [
  "assert_fs",
+ "async-trait",
  "clap 4.5.39",
  "env_logger",
  "lazy_static",
