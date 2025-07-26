@@ -337,18 +337,28 @@ pub struct InterfaceIPs {
 impl ServerInfo {
     /// Checks for required system dependencies and returns any missing ones
     fn check_dependencies() -> Result<Vec<&'static str>, Box<dyn Error>> {
-        let required_packages = vec![
-            ("numactl", "NUMA topology information"),
-            ("lspci", "PCI device information"),
-            ("ethtool", "Network interface information"),
-            ("dmidecode", "System hardware information"),
-            ("lscpu", "CPU information"),
-            ("ip", "Network interface details"),
-            ("lsblk", "Storage device information"),
-            ("hostname", "System hostname"),
-            ("free", "Memory usage information"),
-            ("df", "Filesystem information"),
-        ];
+        let required_packages = if cfg!(target_os = "macos") {
+            vec![
+                ("system_profiler", "System hardware information"),
+                ("sysctl", "System configuration information"),
+                ("ioreg", "Hardware registry information"),
+                ("hostname", "System hostname"),
+                ("df", "Filesystem information"),
+            ]
+        } else {
+            vec![
+                ("numactl", "NUMA topology information"),
+                ("lspci", "PCI device information"),
+                ("ethtool", "Network interface information"),
+                ("dmidecode", "System hardware information"),
+                ("lscpu", "CPU information"),
+                ("ip", "Network interface details"),
+                ("lsblk", "Storage device information"),
+                ("hostname", "System hostname"),
+                ("free", "Memory usage information"),
+                ("df", "Filesystem information"),
+            ]
+        };
 
         let mut missing_packages = Vec::new();
         let mut missing_info = Vec::new();
@@ -485,25 +495,36 @@ impl ServerInfo {
 
     /// Converts storage size string to bytes
     fn parse_storage_size(size: &str) -> Result<u64, Box<dyn Error>> {
-        let size_str = size.replace(" ", "");
-        let re = Regex::new(r"(\d+(?:\.\d+)?)(B|K|M|G|T)")?;
+        if size == "Unknown" || size.is_empty() {
+            return Ok(0);
+        }
+
+        let size_str = size.replace(" ", "").to_uppercase();
+        
+        // Handle both Linux format (123G) and macOS format (123 GB)
+        let re = Regex::new(r"(\d+(?:\.\d+)?)\s*(B|KB?|MB?|GB?|TB?|BYTES?)$")?;
 
         if let Some(caps) = re.captures(&size_str) {
             let value: f64 = caps[1].parse()?;
             let unit = &caps[2];
 
             let multiplier = match unit {
-                "B" => 1_u64,
-                "K" => 1024_u64,
-                "M" => 1024_u64 * 1024,
-                "G" => 1024_u64 * 1024 * 1024,
-                "T" => 1024_u64 * 1024 * 1024 * 1024,
-                _ => 0_u64,
+                "B" | "BYTES" => 1_u64,
+                "K" | "KB" => 1024_u64,
+                "M" | "MB" => 1024_u64 * 1024,
+                "G" | "GB" => 1024_u64 * 1024 * 1024,
+                "T" | "TB" => 1024_u64 * 1024 * 1024 * 1024,
+                _ => return Err(format!("Unknown storage unit: {}", unit).into()),
             };
 
             Ok((value * multiplier as f64) as u64)
         } else {
-            Err("Invalid storage size format".into())
+            // Try to handle other formats gracefully
+            if size_str.contains("BYTES") || size_str.contains("B") {
+                Ok(0) // Return 0 for unparseable sizes instead of erroring
+            } else {
+                Err(format!("Invalid storage size format: {}", size).into())
+            }
         }
     }
 
@@ -696,6 +717,12 @@ impl ServerInfo {
     }
 
     fn collect_numa_topology() -> Result<HashMap<String, NumaNode>, Box<dyn Error>> {
+        if cfg!(target_os = "macos") {
+            // NUMA topology is not applicable on macOS in the same way
+            // Return empty HashMap for macOS
+            return Ok(HashMap::new());
+        }
+
         let mut nodes = HashMap::new();
         let mut collecting_distances = false;
 
@@ -821,8 +848,58 @@ impl ServerInfo {
         Ok(interfaces)
     }
 
-    /// Gets system UUID and serial from dmidecode
+    /// Gets system UUID and serial using platform-specific commands
     fn get_system_info() -> Result<SystemInfo, Box<dyn Error>> {
+        if cfg!(target_os = "macos") {
+            Self::get_system_info_macos()
+        } else {
+            Self::get_system_info_linux()
+        }
+    }
+
+    /// Gets system UUID and serial on macOS using system_profiler
+    fn get_system_info_macos() -> Result<SystemInfo, Box<dyn Error>> {
+        let output = match Command::new("system_profiler")
+            .args(&["SPHardwareDataType", "-detailLevel", "basic"])
+            .output()
+        {
+            Ok(output) => output,
+            Err(_) => {
+                return Ok(SystemInfo {
+                    uuid: "Unknown".to_string(),
+                    serial: "Unknown".to_string(),
+                    product_name: "Mac".to_string(),
+                    product_manufacturer: "Apple Inc.".to_string(),
+                });
+            }
+        };
+
+        let output_str = String::from_utf8(output.stdout)?;
+        let mut uuid = "Unknown".to_string();
+        let mut serial = "Unknown".to_string();
+        let mut model = "Mac".to_string();
+
+        for line in output_str.lines() {
+            let trimmed = line.trim();
+            if trimmed.starts_with("Hardware UUID:") {
+                uuid = trimmed.split(":").nth(1).unwrap_or("Unknown").trim().to_string();
+            } else if trimmed.starts_with("Serial Number (system):") {
+                serial = trimmed.split(":").nth(1).unwrap_or("Unknown").trim().to_string();
+            } else if trimmed.starts_with("Model Name:") {
+                model = trimmed.split(":").nth(1).unwrap_or("Mac").trim().to_string();
+            }
+        }
+
+        Ok(SystemInfo {
+            uuid,
+            serial,
+            product_name: model,
+            product_manufacturer: "Apple Inc.".to_string(),
+        })
+    }
+
+    /// Gets system UUID and serial from dmidecode on Linux
+    fn get_system_info_linux() -> Result<SystemInfo, Box<dyn Error>> {
         let output = match Command::new("dmidecode").args(&["-t", "system"]).output() {
             Ok(out) => {
                 if !out.status.success() {
@@ -871,8 +948,8 @@ impl ServerInfo {
         // Check dependencies first and warn about missing packages
         let missing_packages = Self::check_dependencies()?;
 
-        // Automatically install numactl if it's missing
-        if missing_packages.contains(&"numactl") {
+        // Automatically install numactl if it's missing (Linux only)
+        if !cfg!(target_os = "macos") && missing_packages.contains(&"numactl") {
             eprintln!("numactl is not installed. Attempting automatic installation...");
 
             // Try to detect the package manager and install numactl
@@ -1100,6 +1177,51 @@ impl ServerInfo {
 
     /// Gets detailed CPU topology information
     fn get_cpu_topology() -> Result<CpuTopology, Box<dyn Error>> {
+        if cfg!(target_os = "macos") {
+            Self::get_cpu_topology_macos()
+        } else {
+            Self::get_cpu_topology_linux()
+        }
+    }
+
+    /// Gets CPU topology information on macOS
+    fn get_cpu_topology_macos() -> Result<CpuTopology, Box<dyn Error>> {
+        let physical_cores = Self::get_macos_cpu_cores().unwrap_or(0);
+        let logical_cores = Self::get_macos_logical_cpu_cores().unwrap_or(physical_cores);
+        let threads_per_core = if physical_cores > 0 {
+            logical_cores / physical_cores
+        } else {
+            1
+        };
+
+        // Get CPU model from system_profiler
+        let mut cpu_model = "Unknown".to_string();
+        if let Ok(output) = Command::new("system_profiler")
+            .args(&["SPHardwareDataType", "-detailLevel", "basic"])
+            .output()
+        {
+            let output_str = String::from_utf8_lossy(&output.stdout);
+            for line in output_str.lines() {
+                if line.trim().starts_with("Processor Name:") {
+                    cpu_model = line.split(":").nth(1).unwrap_or("Unknown").trim().to_string();
+                    break;
+                }
+            }
+        }
+
+        Ok(CpuTopology {
+            total_cores: physical_cores,
+            total_threads: logical_cores,
+            sockets: 1, // Most Macs have 1 socket
+            cores_per_socket: physical_cores,
+            threads_per_core,
+            numa_nodes: 1, // macOS typically has 1 NUMA node
+            cpu_model,
+        })
+    }
+
+    /// Gets CPU topology information on Linux using lscpu
+    fn get_cpu_topology_linux() -> Result<CpuTopology, Box<dyn Error>> {
         let output = match Command::new("lscpu").args(&["-J"]).output() {
             Ok(output) => output,
             Err(_) => {
@@ -1253,8 +1375,17 @@ impl ServerInfo {
         })
     }
 
-    /// Collects CPU information by parsing 'lscpu' output.
+    /// Collects CPU information by parsing platform-specific commands.
     fn collect_cpu_info() -> Result<CpuInfo, Box<dyn Error>> {
+        if cfg!(target_os = "macos") {
+            Self::collect_cpu_info_macos()
+        } else {
+            Self::collect_cpu_info_linux()
+        }
+    }
+
+    /// Collects CPU information on Linux using lscpu
+    fn collect_cpu_info_linux() -> Result<CpuInfo, Box<dyn Error>> {
         // Use 'lscpu -J' for JSON output to ensure reliable parsing.
         let output = match Command::new("lscpu").args(&["-J"]).output() {
             Ok(output) => output,
@@ -1308,8 +1439,100 @@ impl ServerInfo {
         })
     }
 
-    /// Collects memory information by parsing 'dmidecode' output.
+    /// Collects CPU information on macOS using system_profiler and sysctl
+    fn collect_cpu_info_macos() -> Result<CpuInfo, Box<dyn Error>> {
+        let cores = Self::get_macos_cpu_cores().unwrap_or(0);
+        let logical_cores = Self::get_macos_logical_cpu_cores().unwrap_or(cores);
+        let threads = if logical_cores > cores { logical_cores / cores } else { 1 };
+        let speed = Self::get_macos_cpu_speed().unwrap_or("Unknown".to_string());
+
+        // Get CPU model using system_profiler
+        let model = match Command::new("system_profiler")
+            .args(&["SPHardwareDataType", "-detailLevel", "basic"])
+            .output()
+        {
+            Ok(output) => {
+                let output_str = String::from_utf8(output.stdout)?;
+                // Extract processor name from system_profiler output
+                for line in output_str.lines() {
+                    if line.trim().starts_with("Processor Name:") {
+                        let cpu_name = line.split(":").nth(1).unwrap_or("Unknown").trim().to_string();
+                        return Ok(CpuInfo {
+                            model: cpu_name,
+                            cores,
+                            threads,
+                            sockets: 1, // Most Macs have 1 socket
+                            speed,
+                        });
+                    }
+                }
+                "Unknown".to_string()
+            }
+            Err(_) => "Unknown".to_string(),
+        };
+
+        Ok(CpuInfo {
+            model,
+            cores,
+            threads,
+            sockets: 1,
+            speed,
+        })
+    }
+
+    fn get_macos_cpu_cores() -> Result<u32, Box<dyn Error>> {
+        let output = Command::new("sysctl").args(&["-n", "hw.physicalcpu"]).output()?;
+        let cores_str = String::from_utf8(output.stdout)?;
+        Ok(cores_str.trim().parse().unwrap_or(0))
+    }
+
+    fn get_macos_logical_cpu_cores() -> Result<u32, Box<dyn Error>> {
+        let output = Command::new("sysctl").args(&["-n", "hw.logicalcpu"]).output()?;
+        let cores_str = String::from_utf8(output.stdout)?;
+        Ok(cores_str.trim().parse().unwrap_or(0))
+    }
+
+    fn get_macos_cpu_speed() -> Result<String, Box<dyn Error>> {
+        // Try different sysctl keys for CPU frequency
+        let freq_keys = ["hw.cpufrequency_max", "hw.cpufrequency", "machdep.cpu.max_basic"];
+        
+        for key in &freq_keys {
+            if let Ok(output) = Command::new("sysctl").args(&["-n", key]).output() {
+                let freq_str = String::from_utf8_lossy(&output.stdout);
+                if let Ok(freq_hz) = freq_str.trim().parse::<u64>() {
+                    let freq_mhz = freq_hz / 1_000_000;
+                    return Ok(format!("{} MHz", freq_mhz));
+                }
+            }
+        }
+        
+        // Fallback: try to get from system_profiler
+        if let Ok(output) = Command::new("system_profiler")
+            .args(&["SPHardwareDataType", "-detailLevel", "basic"])
+            .output()
+        {
+            let output_str = String::from_utf8_lossy(&output.stdout);
+            for line in output_str.lines() {
+                if line.trim().starts_with("Processor Speed:") {
+                    return Ok(line.split(":").nth(1).unwrap_or("Unknown").trim().to_string());
+                }
+            }
+        }
+        
+        Ok("Unknown".to_string())
+    }
+
+    /// Collects memory information by parsing platform-specific commands.
     fn collect_memory_info() -> Result<MemoryInfo, Box<dyn Error>> {
+        if cfg!(target_os = "macos") {
+            Self::collect_memory_info_macos()
+        } else {
+            Self::collect_memory_info_linux()
+        }
+    }
+
+    /// Collects memory information on Linux using dmidecode
+    fn collect_memory_info_linux() -> Result<MemoryInfo, Box<dyn Error>> {
         let output = match Command::new("dmidecode").args(&["-t", "memory"]).output() {
             Ok(output) => output,
             Err(_) => {
@@ -1367,8 +1590,127 @@ impl ServerInfo {
         })
     }
 
-    /// Retrieves the total memory size using 'free -h'.
+    /// Collects memory information on macOS using system_profiler
+    fn collect_memory_info_macos() -> Result<MemoryInfo, Box<dyn Error>> {
+        let total = Self::get_total_memory_macos()?;
+        
+        // Use system_profiler to get memory details
+        let output = match Command::new("system_profiler")
+            .args(&["SPMemoryDataType", "-detailLevel", "full"])
+            .output()
+        {
+            Ok(output) => output,
+            Err(_) => {
+                return Ok(MemoryInfo {
+                    total,
+                    type_: "Unknown".to_string(),
+                    speed: "Unknown".to_string(),
+                    modules: Vec::new(),
+                });
+            }
+        };
+
+        let output_str = String::from_utf8(output.stdout)?;
+        let mut modules = Vec::new();
+        let mut current_module = None;
+        let mut current_slot = String::new();
+
+        for line in output_str.lines() {
+            let trimmed = line.trim();
+            
+            if trimmed.starts_with("DIMM") || trimmed.starts_with("BANK") {
+                // Save previous module if exists
+                if let Some(module) = current_module.take() {
+                    modules.push(module);
+                }
+                current_slot = trimmed.to_string();
+                current_module = Some(MemoryModule {
+                    size: "Unknown".to_string(),
+                    type_: "Unknown".to_string(),
+                    speed: "Unknown".to_string(),
+                    location: current_slot.clone(),
+                    manufacturer: "Unknown".to_string(),
+                    serial: "Unknown".to_string(),
+                });
+            } else if let Some(ref mut module) = current_module {
+                if trimmed.starts_with("Size:") {
+                    module.size = trimmed.split(":").nth(1).unwrap_or("Unknown").trim().to_string();
+                } else if trimmed.starts_with("Type:") {
+                    module.type_ = trimmed.split(":").nth(1).unwrap_or("Unknown").trim().to_string();
+                } else if trimmed.starts_with("Speed:") {
+                    module.speed = trimmed.split(":").nth(1).unwrap_or("Unknown").trim().to_string();
+                } else if trimmed.starts_with("Manufacturer:") {
+                    module.manufacturer = trimmed.split(":").nth(1).unwrap_or("Unknown").trim().to_string();
+                } else if trimmed.starts_with("Serial Number:") {
+                    module.serial = trimmed.split(":").nth(1).unwrap_or("Unknown").trim().to_string();
+                }
+            }
+        }
+
+        // Save last module
+        if let Some(module) = current_module {
+            modules.push(module);
+        }
+
+        // Determine overall memory type and speed
+        let mut type_set = HashSet::new();
+        let mut speed_set = HashSet::new();
+        for module in &modules {
+            if module.type_ != "Unknown" {
+                type_set.insert(module.type_.clone());
+            }
+            if module.speed != "Unknown" {
+                speed_set.insert(module.speed.clone());
+            }
+        }
+
+        let type_ = if type_set.len() == 1 {
+            type_set.into_iter().next().unwrap_or("Unknown".to_string())
+        } else if type_set.is_empty() {
+            "Unknown".to_string()
+        } else {
+            "Mixed".to_string()
+        };
+
+        let speed = if speed_set.len() == 1 {
+            speed_set.into_iter().next().unwrap_or("Unknown".to_string())
+        } else if speed_set.is_empty() {
+            "Unknown".to_string()
+        } else {
+            "Mixed".to_string()
+        };
+
+        Ok(MemoryInfo {
+            total,
+            type_,
+            speed,
+            modules,
+        })
+    }
+
+    /// Retrieves the total memory size using platform-specific commands.
     fn get_total_memory() -> Result<String, Box<dyn Error>> {
+        if cfg!(target_os = "macos") {
+            Self::get_total_memory_macos()
+        } else {
+            Self::get_total_memory_linux()
+        }
+    }
+
+    /// Retrieves the total memory size on macOS using sysctl.
+    fn get_total_memory_macos() -> Result<String, Box<dyn Error>> {
+        let output = Command::new("sysctl").args(&["-n", "hw.memsize"]).output()?;
+        let memsize_str = String::from_utf8(output.stdout)?;
+        if let Ok(bytes) = memsize_str.trim().parse::<u64>() {
+            let gb = bytes as f64 / (1024.0 * 1024.0 * 1024.0);
+            Ok(format!("{:.1}G", gb))
+        } else {
+            Ok("Unknown".to_string())
+        }
+    }
+
+    /// Retrieves the total memory size using 'free -h' on Linux.
+    fn get_total_memory_linux() -> Result<String, Box<dyn Error>> {
         let output = match Command::new("free").arg("-h").output() {
             Ok(output) => output,
             Err(_) => {
@@ -1422,8 +1764,67 @@ impl ServerInfo {
         })
     }
 
-    /// Collects storage information by parsing 'lsblk' output.
+    /// Collects storage information using platform-specific commands.
     fn collect_storage_info() -> Result<StorageInfo, Box<dyn Error>> {
+        if cfg!(target_os = "macos") {
+            Self::collect_storage_info_macos()
+        } else {
+            Self::collect_storage_info_linux()
+        }
+    }
+
+    /// Collects storage information on macOS using system_profiler and diskutil
+    fn collect_storage_info_macos() -> Result<StorageInfo, Box<dyn Error>> {
+        let mut devices = Vec::new();
+
+        // Use system_profiler to get storage info
+        let output = match Command::new("system_profiler")
+            .args(&["SPStorageDataType", "-detailLevel", "basic"])
+            .output()
+        {
+            Ok(output) => output,
+            Err(_) => {
+                return Ok(StorageInfo {
+                    devices: Vec::new(),
+                });
+            }
+        };
+
+        let output_str = String::from_utf8(output.stdout)?;
+        let mut current_device = None;
+
+        for line in output_str.lines() {
+            let trimmed = line.trim();
+            
+            if trimmed.ends_with(":") && !trimmed.starts_with(" ") {
+                // This is a new device name
+                if let Some(device) = current_device.take() {
+                    devices.push(device);
+                }
+                let name = trimmed.trim_end_matches(':');
+                current_device = Some(StorageDevice {
+                    name: name.to_string(),
+                    type_: "disk".to_string(),
+                    size: "Unknown".to_string(),
+                    model: name.to_string(),
+                });
+            } else if let Some(ref mut device) = current_device {
+                if trimmed.starts_with("Capacity:") {
+                    device.size = trimmed.split(":").nth(1).unwrap_or("Unknown").trim().to_string();
+                }
+            }
+        }
+
+        // Save last device
+        if let Some(device) = current_device {
+            devices.push(device);
+        }
+
+        Ok(StorageInfo { devices })
+    }
+
+    /// Collects storage information on Linux using lsblk
+    fn collect_storage_info_linux() -> Result<StorageInfo, Box<dyn Error>> {
         let output = match Command::new("lsblk")
             .args(&["-J", "-o", "NAME,TYPE,SIZE,MODEL"])
             .output()
@@ -1456,8 +1857,71 @@ impl ServerInfo {
         Ok(StorageInfo { devices })
     }
 
-    /// Collects GPU information by parsing 'nvidia-smi' output.
+    /// Collects GPU information using platform-specific commands.
     fn collect_gpu_info() -> Result<GpuInfo, Box<dyn Error>> {
+        if cfg!(target_os = "macos") {
+            Self::collect_gpu_info_macos()
+        } else {
+            Self::collect_gpu_info_linux()
+        }
+    }
+
+    /// Collects GPU information on macOS using system_profiler
+    fn collect_gpu_info_macos() -> Result<GpuInfo, Box<dyn Error>> {
+        let mut devices = Vec::new();
+
+        let output = match Command::new("system_profiler")
+            .args(&["SPDisplaysDataType", "-detailLevel", "basic"])
+            .output()
+        {
+            Ok(output) => output,
+            Err(_) => {
+                return Ok(GpuInfo { devices });
+            }
+        };
+
+        let output_str = String::from_utf8(output.stdout)?;
+        let mut index = 0;
+        let mut current_gpu = None;
+
+        for line in output_str.lines() {
+            let trimmed = line.trim();
+            
+            if trimmed.ends_with(":") && !trimmed.starts_with(" ") {
+                // This is a new GPU name
+                if let Some(gpu) = current_gpu.take() {
+                    devices.push(gpu);
+                    index += 1;
+                }
+                let name = trimmed.trim_end_matches(':');
+                current_gpu = Some(GpuDevice {
+                    index,
+                    name: name.to_string(),
+                    uuid: format!("macOS-GPU-{}", index),
+                    memory: "Unknown".to_string(),
+                    pci_id: "Unknown".to_string(),
+                    vendor: "Apple".to_string(),
+                    numa_node: None,
+                });
+            } else if let Some(ref mut gpu) = current_gpu {
+                if trimmed.starts_with("VRAM (Total):") {
+                    gpu.memory = trimmed.split(":").nth(1).unwrap_or("Unknown").trim().to_string();
+                } else if trimmed.starts_with("Vendor:") {
+                    gpu.vendor = trimmed.split(":").nth(1).unwrap_or("Unknown").trim().to_string();
+                }
+            }
+        }
+
+        // Save last GPU
+        if let Some(gpu) = current_gpu {
+            devices.push(gpu);
+        }
+
+        Ok(GpuInfo { devices })
+    }
+
+    /// Collects GPU information on Linux using nvidia-smi
+    fn collect_gpu_info_linux() -> Result<GpuInfo, Box<dyn Error>> {
         let output = Command::new("nvidia-smi")
             .args(&[
                 "--query-gpu=index,name,uuid,memory.total,pci.bus_id",
@@ -1623,6 +2087,11 @@ impl ServerInfo {
 
     /// Collects BMC IP and MAC addresses by parsing 'ipmitool' output.
     fn collect_ipmi_info() -> Result<(Option<String>, Option<String>), Box<dyn Error>> {
+        if cfg!(target_os = "macos") {
+            // IPMI is not typically available on macOS
+            return Ok((None, None));
+        }
+
         let output = Command::new("ipmitool").args(&["lan", "print"]).output();
 
         match output {
