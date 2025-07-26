@@ -102,8 +102,7 @@ impl SystemInfoProvider for MacOSSystemInfoProvider {
                 stderr: e.to_string(),
             })?;
 
-        let devices =
-            parse_macos_storage_info(&output.stdout).map_err(SystemError::ParseError)?;
+        let devices = parse_macos_storage_info(&output.stdout).map_err(SystemError::ParseError)?;
 
         Ok(StorageInfo { devices })
     }

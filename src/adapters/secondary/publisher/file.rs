@@ -52,9 +52,9 @@ impl FileRepository for FileSystemRepository {
             })?;
         }
 
-        fs::write(path, json_string).await.map_err(|e| {
-            PublishError::NetworkFailed(format!("Failed to write JSON file: {e}"))
-        })?;
+        fs::write(path, json_string)
+            .await
+            .map_err(|e| PublishError::NetworkFailed(format!("Failed to write JSON file: {e}")))?;
 
         Ok(())
     }
@@ -71,9 +71,9 @@ impl FileRepository for FileSystemRepository {
             })?;
         }
 
-        fs::write(path, toml_string).await.map_err(|e| {
-            PublishError::NetworkFailed(format!("Failed to write TOML file: {e}"))
-        })?;
+        fs::write(path, toml_string)
+            .await
+            .map_err(|e| PublishError::NetworkFailed(format!("Failed to write TOML file: {e}")))?;
 
         Ok(())
     }
