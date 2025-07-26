@@ -17,5 +17,5 @@ limitations under the License.
 pub mod primary;
 pub mod secondary;
 
-pub use primary::*;
+// Primary adapters are currently empty, will be added as needed
 pub use secondary::*;

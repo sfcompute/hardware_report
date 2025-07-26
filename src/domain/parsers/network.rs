@@ -16,7 +16,6 @@ limitations under the License.
 
 //! Network information parsing functions
 
-use super::common::clean_value;
 use crate::domain::NetworkInterface;
 
 /// Parse network interfaces from ip command output

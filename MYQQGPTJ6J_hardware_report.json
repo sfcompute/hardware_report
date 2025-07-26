@@ -11,14 +11,14 @@
     "total_storage": "2.0 TB",
     "total_storage_tb": 1.81464035063982,
     "filesystems": [
-      "/dev/disk3s1s1 (apfs) - 1.9T total, 261G used, 1.6T available, mounted on /",
-      "/dev/disk3s6 (apfs) - 1.9T total, 261G used, 1.6T available, mounted on /System/Volumes/VM",
-      "/dev/disk3s2 (apfs) - 1.9T total, 261G used, 1.6T available, mounted on /System/Volumes/Preboot",
-      "/dev/disk3s4 (apfs) - 1.9T total, 261G used, 1.6T available, mounted on /System/Volumes/Update",
+      "/dev/disk3s1s1 (apfs) - 1.9T total, 262G used, 1.6T available, mounted on /",
+      "/dev/disk3s6 (apfs) - 1.9T total, 262G used, 1.6T available, mounted on /System/Volumes/VM",
+      "/dev/disk3s2 (apfs) - 1.9T total, 262G used, 1.6T available, mounted on /System/Volumes/Preboot",
+      "/dev/disk3s4 (apfs) - 1.9T total, 262G used, 1.6T available, mounted on /System/Volumes/Update",
       "/dev/disk1s2 (apfs) - 500M total, 19M used, 482M available, mounted on /System/Volumes/xarts",
       "/dev/disk1s1 (apfs) - 500M total, 19M used, 482M available, mounted on /System/Volumes/iSCPreboot",
       "/dev/disk1s3 (apfs) - 500M total, 19M used, 482M available, mounted on /System/Volumes/Hardware",
-      "/dev/disk3s7 (apfs) - 1.9T total, 261G used, 1.6T available, mounted on /nix"
+      "/dev/disk3s7 (apfs) - 1.9T total, 262G used, 1.6T available, mounted on /nix"
     ],
     "bios": {
       "vendor": "Apple Inc.",
@@ -41,7 +41,7 @@
       "type_": "Motherboard"
     },
     "total_gpus": 1,
-    "total_nics": 7,
+    "total_nics": 6,
     "numa_topology": {},
     "cpu_topology": {
       "total_cores": 16,
@@ -99,7 +99,7 @@
           "name": "Apple M4 Max (Metal 3)",
           "uuid": "macOS-GPU-0",
           "memory": "Unified Memory (40 cores)",
-          "pci_id": "Unknown",
+          "pci_id": "Apple Fabric (Integrated)",
           "vendor": "Apple",
           "numa_node": null
         }
@@ -109,17 +109,6 @@
   "network": {
     "interfaces": [
       {
-        "name": "Network",
-        "mac": "Unknown",
-        "ip": "Unknown",
-        "speed": null,
-        "type_": "Unknown",
-        "vendor": "Unknown",
-        "model": "Unknown",
-        "pci_id": "Unknown",
-        "numa_node": null
-      },
-      {
         "name": "en4",
         "mac": "56",
         "ip": "Unknown",
@@ -127,7 +116,7 @@
         "type_": "Ethernet",
         "vendor": "Apple",
         "model": "Ethernet",
-        "pci_id": "Unknown",
+        "pci_id": "Apple Fabric (Integrated)",
         "numa_node": null
       },
       {
@@ -138,7 +127,7 @@
         "type_": "Ethernet",
         "vendor": "Apple",
         "model": "Ethernet",
-        "pci_id": "Unknown",
+        "pci_id": "Apple Fabric (Integrated)",
         "numa_node": null
       },
       {
@@ -149,7 +138,7 @@
         "type_": "Ethernet",
         "vendor": "Apple",
         "model": "Ethernet",
-        "pci_id": "Unknown",
+        "pci_id": "Apple Fabric (Integrated)",
         "numa_node": null
       },
       {
@@ -160,7 +149,7 @@
         "type_": "Ethernet",
         "vendor": "Apple",
         "model": "Ethernet",
-        "pci_id": "Unknown",
+        "pci_id": "Apple Fabric (Integrated)",
         "numa_node": null
       },
       {
@@ -171,7 +160,7 @@
         "type_": "AirPort",
         "vendor": "Apple",
         "model": "Wi-Fi 802.11 a/b/g/n/ac/ax",
-        "pci_id": "Unknown",
+        "pci_id": "Apple Fabric (Integrated)",
         "numa_node": null
       },
       {

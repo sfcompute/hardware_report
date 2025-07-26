@@ -17,7 +17,7 @@ limitations under the License.
 //! Memory information parsing functions
 
 use super::common::{
-    bytes_to_human_readable, clean_value, extract_dmidecode_value, parse_size_to_bytes,
+    bytes_to_human_readable, clean_value, parse_size_to_bytes,
 };
 use crate::domain::{MemoryInfo, MemoryModule};
 

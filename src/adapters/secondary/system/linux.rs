@@ -292,7 +292,7 @@ impl SystemInfoProvider for LinuxSystemInfoProvider {
         let dmidecode_cmd = SystemCommand::new("dmidecode")
             .args(&["-t", "2"])
             .timeout(Duration::from_secs(10));
-        let dmidecode_output = self
+        let _dmidecode_output = self
             .command_executor
             .execute_with_privileges(&dmidecode_cmd)
             .await
@@ -303,6 +303,7 @@ impl SystemInfoProvider for LinuxSystemInfoProvider {
             })?;
 
         // Parse motherboard info (simplified)
+        // TODO: Parse _dmidecode_output.stdout to extract actual values
         Ok(MotherboardInfo {
             manufacturer: "Unknown".to_string(),
             product_name: "Unknown".to_string(),
