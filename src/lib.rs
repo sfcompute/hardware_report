@@ -34,7 +34,7 @@ limitations under the License.
 //! 
 //! async fn example() -> Result<(), Box<dyn std::error::Error>> {
 //!     // Create service with platform-specific adapters
-//!     let service = hardware_report::create_service().await?;
+//!     let service = hardware_report::create_service(None).await?;
 //!     
 //!     // Generate hardware report
 //!     let config = ReportConfig::default();
@@ -2680,7 +2680,7 @@ impl ServerInfo {
 /// 
 /// #[tokio::main]
 /// async fn main() -> Result<(), Box<dyn std::error::Error>> {
-///     let service = create_service().await?;
+///     let service = create_service(None).await?;
 ///     let report = service.generate_report(ReportConfig::default()).await?;
 ///     println!("Generated report for {}", report.hostname);
 ///     Ok(())
