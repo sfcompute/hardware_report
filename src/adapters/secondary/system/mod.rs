@@ -14,10 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-pub mod command;
-pub mod system;
-pub mod publisher;
+pub mod linux;
+pub mod macos;
 
-pub use command::*;
-pub use system::*;
-pub use publisher::*;
+pub use linux::*;
+pub use macos::*;

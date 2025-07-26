@@ -63,10 +63,26 @@ limitations under the License.
 pub mod domain;
 pub mod ports;
 pub mod adapters;
+pub mod container;
 
-// Re-export public API
-pub use domain::*;
-pub use ports::*;
+// Re-export public API - specific exports to avoid conflicts with legacy types
+// Only export new types that don't conflict with legacy compatibility layer
+pub use domain::{ReportConfig, PublishConfig, ReportError, PublishError};
+pub use ports::{
+    HardwareReportingService, SystemInfoProvider, CommandExecutor, DataPublisher, 
+    FileRepository, ConfigurationProvider, OutputFormat
+};
+pub use adapters::{
+    UnixCommandExecutor, LinuxSystemInfoProvider, MacOSSystemInfoProvider,
+    HttpDataPublisher, FileSystemRepository, FileDataPublisher
+};
+pub use container::{ServiceContainer, ContainerConfig, ContainerConfigBuilder};
+
+// Re-export domain entities under a namespace to avoid conflicts  
+pub use domain::HardwareReport as NewHardwareReport;
+pub mod new_domain {
+    pub use crate::domain::*;
+}
 
 // Legacy compatibility - keep original types and implementations
 use lazy_static::lazy_static;
@@ -2670,7 +2686,81 @@ impl ServerInfo {
 ///     Ok(())
 /// }
 /// ```
-pub async fn create_service() -> Result<std::sync::Arc<dyn HardwareReportingService>, Box<dyn Error>> {
-    // This will be implemented when we create the adapters and DI container
-    todo!("Service factory will be implemented in Phase 4")
+/// Create a hardware reporting service with platform-appropriate adapters
+/// 
+/// This function sets up the complete dependency injection container with
+/// platform-specific implementations for the current operating system.
+/// 
+/// # Arguments
+/// * `config` - Optional report configuration (uses defaults if None)
+/// 
+/// # Returns
+/// * `Ok(Arc<dyn HardwareReportingService>)` - Configured service ready to use
+/// * `Err(Box<dyn Error>)` - Error occurred during service creation
+/// 
+/// # Example
+/// 
+/// ```rust,no_run
+/// use hardware_report::{create_service, ReportConfig};
+/// 
+/// #[tokio::main]
+/// async fn main() -> Result<(), Box<dyn std::error::Error>> {
+///     let service = create_service(None).await?;
+///     let report = service.generate_report(ReportConfig::default()).await?;
+///     println!("Generated report for {}", report.hostname);
+///     Ok(())
+/// }
+/// ```
+pub async fn create_service(config: Option<ReportConfig>) -> Result<std::sync::Arc<dyn HardwareReportingService>, Box<dyn Error>> {
+    let container = ServiceContainer::default();
+    container.create_hardware_reporting_service(config)
+}
+
+/// Create a hardware reporting service with custom container configuration
+/// 
+/// # Arguments
+/// * `container_config` - Container configuration for customizing behavior
+/// * `report_config` - Optional report configuration
+/// 
+/// # Returns
+/// * Configured hardware reporting service
+pub async fn create_service_with_config(
+    container_config: ContainerConfig,
+    report_config: Option<ReportConfig>
+) -> Result<std::sync::Arc<dyn HardwareReportingService>, Box<dyn Error>> {
+    let container = ServiceContainer::new(container_config);
+    container.create_hardware_reporting_service(report_config)
+}
+
+/// Validate system dependencies and privileges
+/// 
+/// # Returns
+/// * `Ok((missing_deps, has_privileges))` - Missing dependencies and privilege status
+/// * `Err(Box<dyn Error>)` - Error occurred during validation
+/// 
+/// # Example
+/// 
+/// ```rust,no_run
+/// use hardware_report::validate_system;
+/// 
+/// #[tokio::main]
+/// async fn main() -> Result<(), Box<dyn std::error::Error>> {
+///     let (missing, has_privs) = validate_system().await?;
+///     
+///     if !missing.is_empty() {
+///         println!("Missing dependencies: {:?}", missing);
+///     }
+///     
+///     if !has_privs {
+///         println!("Warning: Running without elevated privileges");
+///     }
+///     
+///     Ok(())
+/// }
+/// ```
+pub async fn validate_system() -> Result<(Vec<String>, bool), Box<dyn Error>> {
+    let container = ServiceContainer::default();
+    let missing_deps = container.validate_dependencies().await?;
+    let has_privileges = container.check_privileges().await?;
+    Ok((missing_deps, has_privileges))
 }

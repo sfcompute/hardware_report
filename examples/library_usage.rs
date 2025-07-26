@@ -18,7 +18,7 @@ limitations under the License.
 //! 
 //! This demonstrates both the new Ports & Adapters API and the legacy compatibility.
 
-use hardware_report::{ServerInfo, HardwareReport, ReportConfig};
+use hardware_report::{ServerInfo, new_domain::HardwareReport, ReportConfig};
 use std::error::Error;
 
 fn main() -> Result<(), Box<dyn Error>> {
@@ -66,7 +66,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     
     // Example 4: Pure parsing functions
     println!("\n4. Pure Parsing Functions:");
-    use hardware_report::parse_lscpu_output;
+    use hardware_report::new_domain::parsers::cpu::parse_lscpu_output;
     
     let sample_lscpu = r#"Model name:                      Intel(R) Core(TM) i7-10875H CPU @ 2.30GHz
 CPU(s):                          16
