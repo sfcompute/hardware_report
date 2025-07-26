@@ -123,12 +123,32 @@ impl SystemInfoProvider for MacOSSystemInfoProvider {
             let trimmed = line.trim();
             if trimmed.contains("M1") || trimmed.contains("M2") || trimmed.contains("M3") || trimmed.contains("M4") {
                 if trimmed.contains("Max") || trimmed.contains("Pro") || trimmed.contains("Ultra") {
+                    let memory_cores = if trimmed.contains("M4 Max") { 
+                        "40 cores" 
+                    } else if trimmed.contains("M4 Pro") { 
+                        "20 cores" 
+                    } else if trimmed.contains("M3 Max") { 
+                        "40 cores" 
+                    } else if trimmed.contains("M3 Pro") { 
+                        "18 cores" 
+                    } else if trimmed.contains("M2 Max") { 
+                        "38 cores" 
+                    } else if trimmed.contains("M2 Pro") { 
+                        "19 cores" 
+                    } else if trimmed.contains("M1 Max") { 
+                        "32 cores" 
+                    } else if trimmed.contains("M1 Pro") { 
+                        "16 cores" 
+                    } else { 
+                        "Unknown" 
+                    };
+                    
                     devices.push(crate::domain::GpuDevice {
                         index: gpu_index,
                         name: format!("Apple {} (Metal 3)", trimmed),
                         uuid: format!("macOS-GPU-{}", gpu_index),
-                        memory: "Unified Memory".to_string(),
-                        pci_id: "Unknown".to_string(),
+                        memory: format!("Unified Memory ({} GPU cores)", memory_cores),
+                        pci_id: "Apple Fabric (Integrated)".to_string(),
                         vendor: "Apple".to_string(),
                         numa_node: None,
                     });
@@ -144,7 +164,7 @@ impl SystemInfoProvider for MacOSSystemInfoProvider {
                 name: "Integrated Graphics".to_string(),
                 uuid: "macOS-GPU-0".to_string(),
                 memory: "Unknown".to_string(),
-                pci_id: "Unknown".to_string(),
+                pci_id: "Apple Fabric (Integrated)".to_string(),
                 vendor: "Apple".to_string(),
                 numa_node: None,
             });

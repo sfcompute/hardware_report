@@ -242,7 +242,7 @@ pub struct GpuDevice {
     pub uuid: String,
     /// Total GPU memory
     pub memory: String,
-    /// PCI ID (vendor:device)
+    /// PCI ID (vendor:device) or Apple Fabric for Apple Silicon
     pub pci_id: String,
     /// Vendor name
     pub vendor: String,
@@ -276,7 +276,7 @@ pub struct NetworkInterface {
     pub vendor: String,
     /// Model
     pub model: String,
-    /// PCI ID
+    /// PCI ID or Apple Fabric for Apple Silicon
     pub pci_id: String,
     /// NUMA node
     pub numa_node: Option<i32>,
