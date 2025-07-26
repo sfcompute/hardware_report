@@ -150,7 +150,11 @@ pub enum SystemError {
 impl fmt::Display for SystemError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            SystemError::CommandFailed { command, exit_code, stderr } => {
+            SystemError::CommandFailed {
+                command,
+                exit_code,
+                stderr,
+            } => {
                 write!(f, "Command '{}' failed", command)?;
                 if let Some(code) = exit_code {
                     write!(f, " with exit code {}", code)?;
@@ -178,21 +182,15 @@ impl From<SystemError> for DomainError {
             SystemError::CommandFailed { command, .. } => {
                 DomainError::HardwareCollectionFailed(format!("System command failed: {}", command))
             }
-            SystemError::CommandNotFound(cmd) => {
-                DomainError::MissingDependencies(vec![cmd])
-            }
+            SystemError::CommandNotFound(cmd) => DomainError::MissingDependencies(vec![cmd]),
             SystemError::PermissionDenied(_) => {
                 DomainError::InsufficientPrivileges("System access denied".to_string())
             }
             SystemError::IoError(msg) => {
                 DomainError::SystemInfoUnavailable(format!("I/O error: {}", msg))
             }
-            SystemError::ParseError(msg) => {
-                DomainError::ParsingFailed(msg)
-            }
-            SystemError::Timeout(msg) => {
-                DomainError::Timeout(msg)
-            }
+            SystemError::ParseError(msg) => DomainError::ParsingFailed(msg),
+            SystemError::Timeout(msg) => DomainError::Timeout(msg),
         }
     }
 }

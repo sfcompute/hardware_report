@@ -16,13 +16,13 @@ limitations under the License.
 
 //! Network information parsing functions
 
-use crate::domain::NetworkInterface;
 use super::common::clean_value;
+use crate::domain::NetworkInterface;
 
 /// Parse network interfaces from ip command output
 pub fn parse_ip_output(ip_output: &str) -> Result<Vec<NetworkInterface>, String> {
     let mut interfaces = Vec::new();
-    
+
     // Simplified parsing - real implementation would be more comprehensive
     for line in ip_output.lines() {
         if line.contains("eth") || line.contains("ens") {
@@ -39,47 +39,47 @@ pub fn parse_ip_output(ip_output: &str) -> Result<Vec<NetworkInterface>, String>
             });
         }
     }
-    
+
     Ok(interfaces)
 }
 
 /// Parse network interfaces from macOS ifconfig output  
 pub fn parse_macos_network_info(ifconfig_output: &str) -> Result<Vec<NetworkInterface>, String> {
     let mut interfaces = Vec::new();
-    
+
     let mut current_interface: Option<NetworkInterface> = None;
-    
+
     for line in ifconfig_output.lines() {
         let trimmed = line.trim();
-        
+
         // Look for interface names at the beginning of lines
         if !line.starts_with(' ') && !line.starts_with('\t') && line.contains(':') {
             // Save previous interface if it exists
             if let Some(interface) = current_interface.take() {
                 interfaces.push(interface);
             }
-            
+
             // Extract interface name
             if let Some(name) = line.split(':').next() {
                 let interface_type = classify_interface_type(name);
-                let vendor = if name.starts_with("en") || name.starts_with("bridge") { 
-                    "Apple" 
-                } else { 
-                    "Unknown" 
+                let vendor = if name.starts_with("en") || name.starts_with("bridge") {
+                    "Apple"
+                } else {
+                    "Unknown"
                 };
                 let model = match interface_type.as_str() {
                     "AirPort" => "Wi-Fi 802.11 a/b/g/n/ac/ax",
-                    "Ethernet" => "Ethernet", 
+                    "Ethernet" => "Ethernet",
                     "VPN (io.tailscale.ipn.macos)" => "Unknown",
                     _ => "Unknown",
                 };
-                
+
                 let pci_id = if vendor == "Apple" {
                     "Apple Fabric (Integrated)".to_string()
                 } else {
                     "Unknown".to_string()
                 };
-                
+
                 current_interface = Some(NetworkInterface {
                     name: name.to_string(),
                     mac: "Unknown".to_string(),
@@ -107,17 +107,17 @@ pub fn parse_macos_network_info(ifconfig_output: &str) -> Result<Vec<NetworkInte
             }
         }
     }
-    
+
     // Add the last interface
     if let Some(interface) = current_interface {
         interfaces.push(interface);
     }
-    
+
     // Add speed estimates for known interface types
     for interface in &mut interfaces {
         interface.speed = estimate_interface_speed(&interface.name, &interface.type_);
     }
-    
+
     Ok(interfaces)
 }
 
@@ -130,7 +130,7 @@ fn classify_interface_type(name: &str) -> String {
     } else if name.starts_with("bridge") {
         "Ethernet".to_string()
     } else if name.starts_with("utun") {
-        // Check if it's Tailscale or other VPN 
+        // Check if it's Tailscale or other VPN
         "VPN (io.tailscale.ipn.macos)".to_string()
     } else if name.starts_with("lo") {
         "Loopback".to_string()

@@ -15,7 +15,7 @@ limitations under the License.
 */
 
 //! Legacy compatibility layer for converting between old and new types
-//! 
+//!
 //! This module provides conversion traits to maintain backward compatibility
 //! while transitioning to the new Ports and Adapters architecture.
 
@@ -68,7 +68,11 @@ impl From<crate::SystemSummary> for new::SystemSummary {
             motherboard: legacy.motherboard.into(),
             total_gpus: legacy.total_gpus,
             total_nics: legacy.total_nics,
-            numa_topology: legacy.numa_topology.into_iter().map(|(k, v)| (k, v.into())).collect(),
+            numa_topology: legacy
+                .numa_topology
+                .into_iter()
+                .map(|(k, v)| (k, v.into()))
+                .collect(),
             cpu_topology: legacy.cpu_topology.into(),
             cpu_summary: legacy.cpu_summary,
         }
@@ -90,7 +94,11 @@ impl From<new::SystemSummary> for crate::SystemSummary {
             motherboard: new_summary.motherboard.into(),
             total_gpus: new_summary.total_gpus,
             total_nics: new_summary.total_nics,
-            numa_topology: new_summary.numa_topology.into_iter().map(|(k, v)| (k, v.into())).collect(),
+            numa_topology: new_summary
+                .numa_topology
+                .into_iter()
+                .map(|(k, v)| (k, v.into()))
+                .collect(),
             cpu_topology: new_summary.cpu_topology.into(),
             cpu_summary: new_summary.cpu_summary,
         }

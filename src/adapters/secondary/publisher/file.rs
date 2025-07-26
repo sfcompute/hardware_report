@@ -41,59 +41,63 @@ impl Default for FileSystemRepository {
 #[async_trait]
 impl FileRepository for FileSystemRepository {
     async fn save_json(&self, report: &HardwareReport, path: &Path) -> Result<(), PublishError> {
-        let json_string = serde_json::to_string_pretty(report)
-            .map_err(|e| PublishError::SerializationFailed(format!("JSON serialization failed: {}", e)))?;
-        
+        let json_string = serde_json::to_string_pretty(report).map_err(|e| {
+            PublishError::SerializationFailed(format!("JSON serialization failed: {}", e))
+        })?;
+
         // Ensure parent directory exists
         if let Some(parent) = path.parent() {
-            fs::create_dir_all(parent)
-                .await
-                .map_err(|e| PublishError::NetworkFailed(format!("Failed to create directory: {}", e)))?;
+            fs::create_dir_all(parent).await.map_err(|e| {
+                PublishError::NetworkFailed(format!("Failed to create directory: {}", e))
+            })?;
         }
-        
-        fs::write(path, json_string)
-            .await
-            .map_err(|e| PublishError::NetworkFailed(format!("Failed to write JSON file: {}", e)))?;
-        
+
+        fs::write(path, json_string).await.map_err(|e| {
+            PublishError::NetworkFailed(format!("Failed to write JSON file: {}", e))
+        })?;
+
         Ok(())
     }
-    
+
     async fn save_toml(&self, report: &HardwareReport, path: &Path) -> Result<(), PublishError> {
-        let toml_string = toml::to_string_pretty(report)
-            .map_err(|e| PublishError::SerializationFailed(format!("TOML serialization failed: {}", e)))?;
-        
+        let toml_string = toml::to_string_pretty(report).map_err(|e| {
+            PublishError::SerializationFailed(format!("TOML serialization failed: {}", e))
+        })?;
+
         // Ensure parent directory exists
         if let Some(parent) = path.parent() {
-            fs::create_dir_all(parent)
-                .await
-                .map_err(|e| PublishError::NetworkFailed(format!("Failed to create directory: {}", e)))?;
+            fs::create_dir_all(parent).await.map_err(|e| {
+                PublishError::NetworkFailed(format!("Failed to create directory: {}", e))
+            })?;
         }
-        
-        fs::write(path, toml_string)
-            .await
-            .map_err(|e| PublishError::NetworkFailed(format!("Failed to write TOML file: {}", e)))?;
-        
+
+        fs::write(path, toml_string).await.map_err(|e| {
+            PublishError::NetworkFailed(format!("Failed to write TOML file: {}", e))
+        })?;
+
         Ok(())
     }
-    
+
     async fn load_json(&self, path: &Path) -> Result<HardwareReport, PublishError> {
         let json_string = fs::read_to_string(path)
             .await
             .map_err(|e| PublishError::NetworkFailed(format!("Failed to read JSON file: {}", e)))?;
-        
-        serde_json::from_str(&json_string)
-            .map_err(|e| PublishError::SerializationFailed(format!("JSON deserialization failed: {}", e)))
+
+        serde_json::from_str(&json_string).map_err(|e| {
+            PublishError::SerializationFailed(format!("JSON deserialization failed: {}", e))
+        })
     }
-    
+
     async fn load_toml(&self, path: &Path) -> Result<HardwareReport, PublishError> {
         let toml_string = fs::read_to_string(path)
             .await
             .map_err(|e| PublishError::NetworkFailed(format!("Failed to read TOML file: {}", e)))?;
-        
-        toml::from_str(&toml_string)
-            .map_err(|e| PublishError::SerializationFailed(format!("TOML deserialization failed: {}", e)))
+
+        toml::from_str(&toml_string).map_err(|e| {
+            PublishError::SerializationFailed(format!("TOML deserialization failed: {}", e))
+        })
     }
-    
+
     async fn file_exists(&self, path: &Path) -> Result<bool, PublishError> {
         Ok(path.exists())
     }
@@ -111,30 +115,34 @@ impl FileDataPublisher {
             repository: FileSystemRepository::new(),
         }
     }
-    
+
     /// Save hardware report to both JSON and TOML files
-    /// 
+    ///
     /// # Arguments
     /// * `report` - The hardware report to save
     /// * `base_path` - Base path without extension (e.g., "/path/to/report")
-    /// 
+    ///
     /// # Returns
     /// * `Ok((json_path, toml_path))` - Paths to the saved files
     /// * `Err(PublishError)` - Error occurred during save
-    pub async fn save_both_formats(&self, report: &HardwareReport, base_path: &str) -> Result<(String, String), PublishError> {
+    pub async fn save_both_formats(
+        &self,
+        report: &HardwareReport,
+        base_path: &str,
+    ) -> Result<(String, String), PublishError> {
         let json_path = format!("{}.json", base_path);
         let toml_path = format!("{}.toml", base_path);
-        
+
         // Save both formats
         let json_result = self.repository.save_json(report, Path::new(&json_path));
         let toml_result = self.repository.save_toml(report, Path::new(&toml_path));
-        
+
         // Wait for both operations to complete
         let (json_res, toml_res) = tokio::join!(json_result, toml_result);
-        
+
         json_res?;
         toml_res?;
-        
+
         Ok((json_path, toml_path))
     }
 }
@@ -148,7 +156,7 @@ impl Default for FileDataPublisher {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::domain::{HardwareReport, SystemSummary, SystemInfo, HardwareInfo, NetworkInfo};
+    use crate::domain::{HardwareInfo, HardwareReport, NetworkInfo, SystemInfo, SystemSummary};
     use std::collections::HashMap;
     use tempfile::tempdir;
 
@@ -198,7 +206,8 @@ mod tests {
                     numa_nodes: 1,
                     cpu_model: "Test CPU".to_string(),
                 },
-                cpu_summary: "Test CPU (1 Socket, 8 Cores/Socket, 2 Threads/Core, 1 NUMA Node)".to_string(),
+                cpu_summary: "Test CPU (1 Socket, 8 Cores/Socket, 2 Threads/Core, 1 NUMA Node)"
+                    .to_string(),
             },
             hostname: "test-host".to_string(),
             fqdn: "test-host.example.com".to_string(),
@@ -219,12 +228,8 @@ mod tests {
                     speed: "3200 MHz".to_string(),
                     modules: vec![],
                 },
-                storage: crate::domain::StorageInfo {
-                    devices: vec![],
-                },
-                gpus: crate::domain::GpuInfo {
-                    devices: vec![],
-                },
+                storage: crate::domain::StorageInfo { devices: vec![] },
+                gpus: crate::domain::GpuInfo { devices: vec![] },
             },
             network: NetworkInfo {
                 interfaces: vec![],
@@ -237,65 +242,92 @@ mod tests {
     async fn test_save_load_json() {
         let temp_dir = tempdir().unwrap();
         let file_path = temp_dir.path().join("test_report.json");
-        
+
         let repository = FileSystemRepository::new();
         let original_report = create_test_report();
-        
+
         // Save the report
-        repository.save_json(&original_report, &file_path).await.unwrap();
-        
+        repository
+            .save_json(&original_report, &file_path)
+            .await
+            .unwrap();
+
         // Verify file exists
         assert!(repository.file_exists(&file_path).await.unwrap());
-        
+
         // Load the report back
         let loaded_report = repository.load_json(&file_path).await.unwrap();
-        
+
         // Verify key fields match
         assert_eq!(original_report.hostname, loaded_report.hostname);
-        assert_eq!(original_report.summary.system_info.uuid, loaded_report.summary.system_info.uuid);
+        assert_eq!(
+            original_report.summary.system_info.uuid,
+            loaded_report.summary.system_info.uuid
+        );
     }
 
     #[tokio::test]
     async fn test_save_load_toml() {
         let temp_dir = tempdir().unwrap();
         let file_path = temp_dir.path().join("test_report.toml");
-        
+
         let repository = FileSystemRepository::new();
         let original_report = create_test_report();
-        
+
         // Save the report
-        repository.save_toml(&original_report, &file_path).await.unwrap();
-        
+        repository
+            .save_toml(&original_report, &file_path)
+            .await
+            .unwrap();
+
         // Verify file exists
         assert!(repository.file_exists(&file_path).await.unwrap());
-        
+
         // Load the report back
         let loaded_report = repository.load_toml(&file_path).await.unwrap();
-        
+
         // Verify key fields match
         assert_eq!(original_report.hostname, loaded_report.hostname);
-        assert_eq!(original_report.summary.system_info.uuid, loaded_report.summary.system_info.uuid);
+        assert_eq!(
+            original_report.summary.system_info.uuid,
+            loaded_report.summary.system_info.uuid
+        );
     }
 
     #[tokio::test]
     async fn test_save_both_formats() {
         let temp_dir = tempdir().unwrap();
-        let base_path = temp_dir.path().join("test_report").to_string_lossy().to_string();
-        
+        let base_path = temp_dir
+            .path()
+            .join("test_report")
+            .to_string_lossy()
+            .to_string();
+
         let publisher = FileDataPublisher::new();
         let report = create_test_report();
-        
+
         // Save both formats
-        let (json_path, toml_path) = publisher.save_both_formats(&report, &base_path).await.unwrap();
-        
+        let (json_path, toml_path) = publisher
+            .save_both_formats(&report, &base_path)
+            .await
+            .unwrap();
+
         // Verify both files exist
         assert!(Path::new(&json_path).exists());
         assert!(Path::new(&toml_path).exists());
-        
+
         // Verify we can load from both
-        let json_report = publisher.repository.load_json(Path::new(&json_path)).await.unwrap();
-        let toml_report = publisher.repository.load_toml(Path::new(&toml_path)).await.unwrap();
-        
+        let json_report = publisher
+            .repository
+            .load_json(Path::new(&json_path))
+            .await
+            .unwrap();
+        let toml_report = publisher
+            .repository
+            .load_toml(Path::new(&toml_path))
+            .await
+            .unwrap();
+
         assert_eq!(json_report.hostname, report.hostname);
         assert_eq!(toml_report.hostname, report.hostname);
     }
@@ -303,14 +335,18 @@ mod tests {
     #[tokio::test]
     async fn test_create_directory() {
         let temp_dir = tempdir().unwrap();
-        let nested_path = temp_dir.path().join("nested").join("directory").join("report.json");
-        
+        let nested_path = temp_dir
+            .path()
+            .join("nested")
+            .join("directory")
+            .join("report.json");
+
         let repository = FileSystemRepository::new();
         let report = create_test_report();
-        
+
         // This should create the nested directory structure
         repository.save_json(&report, &nested_path).await.unwrap();
-        
+
         // Verify file was created
         assert!(nested_path.exists());
     }

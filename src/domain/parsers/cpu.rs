@@ -16,10 +16,10 @@ limitations under the License.
 
 //! CPU information parsing functions
 
+use super::common::{clean_value, extract_dmidecode_value, parse_key_value};
 use crate::domain::{CpuInfo, CpuTopology};
-use super::common::{extract_dmidecode_value, parse_key_value, clean_value};
-use regex::Regex;
 use lazy_static::lazy_static;
+use regex::Regex;
 
 lazy_static! {
     static ref CPU_SPEED_RE: Regex = Regex::new(r"(\d+(?:\.\d+)?)\s*(MHz|GHz)").unwrap();
@@ -27,10 +27,10 @@ lazy_static! {
 }
 
 /// Parse CPU information from Linux lscpu output
-/// 
+///
 /// # Arguments
 /// * `lscpu_output` - Raw output from lscpu command
-/// 
+///
 /// # Returns
 /// * `Ok(CpuInfo)` - Parsed CPU information
 /// * `Err(String)` - Parse error description
@@ -87,25 +87,25 @@ pub fn parse_lscpu_output(lscpu_output: &str) -> Result<CpuInfo, String> {
 }
 
 /// Parse CPU information from dmidecode processor output
-/// 
+///
 /// # Arguments
 /// * `dmidecode_output` - Raw output from dmidecode -t processor
-/// 
+///
 /// # Returns
 /// * `Ok(CpuInfo)` - Parsed CPU information
 /// * `Err(String)` - Parse error description
 pub fn parse_dmidecode_cpu(dmidecode_output: &str) -> Result<CpuInfo, String> {
     let model = extract_dmidecode_value(dmidecode_output, "Version")
         .unwrap_or_else(|_| "Unknown CPU".to_string());
-    
+
     let speed = extract_dmidecode_value(dmidecode_output, "Current Speed")
         .or_else(|_| extract_dmidecode_value(dmidecode_output, "Max Speed"))
         .unwrap_or_else(|_| "Unknown".to_string());
-    
-    let core_count_str = extract_dmidecode_value(dmidecode_output, "Core Count")
-        .unwrap_or_else(|_| "1".to_string());
+
+    let core_count_str =
+        extract_dmidecode_value(dmidecode_output, "Core Count").unwrap_or_else(|_| "1".to_string());
     let cores = core_count_str.parse::<u32>().unwrap_or(1);
-    
+
     let thread_count_str = extract_dmidecode_value(dmidecode_output, "Thread Count")
         .unwrap_or_else(|_| "1".to_string());
     let threads = thread_count_str.parse::<u32>().unwrap_or(1);
@@ -120,10 +120,10 @@ pub fn parse_dmidecode_cpu(dmidecode_output: &str) -> Result<CpuInfo, String> {
 }
 
 /// Parse CPU information from macOS system_profiler output
-/// 
+///
 /// # Arguments
 /// * `system_profiler_output` - Raw output from system_profiler SPHardwareDataType
-/// 
+///
 /// # Returns
 /// * `Ok(CpuInfo)` - Parsed CPU information
 /// * `Err(String)` - Parse error description
@@ -134,20 +134,26 @@ pub fn parse_macos_cpu_info(system_profiler_output: &str) -> Result<CpuInfo, Str
 
     for line in system_profiler_output.lines() {
         let trimmed = line.trim();
-        
+
         if trimmed.starts_with("Chip:") {
-            model = trimmed.split(':').nth(1)
+            model = trimmed
+                .split(':')
+                .nth(1)
                 .unwrap_or("Unknown CPU")
                 .trim()
                 .to_string();
         } else if trimmed.starts_with("Processor Name:") {
             // Fallback for Intel Macs
-            model = trimmed.split(':').nth(1)
+            model = trimmed
+                .split(':')
+                .nth(1)
                 .unwrap_or("Unknown CPU")
                 .trim()
                 .to_string();
         } else if trimmed.starts_with("Total Number of Cores:") {
-            let core_str = trimmed.split(':').nth(1)
+            let core_str = trimmed
+                .split(':')
+                .nth(1)
                 .unwrap_or("1")
                 .trim()
                 .split_whitespace()
@@ -155,7 +161,9 @@ pub fn parse_macos_cpu_info(system_profiler_output: &str) -> Result<CpuInfo, Str
                 .unwrap_or("1");
             cores = core_str.parse::<u32>().unwrap_or(1);
         } else if trimmed.starts_with("Processor Speed:") {
-            speed = trimmed.split(':').nth(1)
+            speed = trimmed
+                .split(':')
+                .nth(1)
                 .unwrap_or("Unknown")
                 .trim()
                 .to_string();
@@ -172,11 +180,11 @@ pub fn parse_macos_cpu_info(system_profiler_output: &str) -> Result<CpuInfo, Str
 }
 
 /// Combine CPU information from multiple sources
-/// 
+///
 /// # Arguments
 /// * `primary` - Primary CPU info (e.g., from lscpu)
 /// * `secondary` - Secondary CPU info (e.g., from dmidecode)
-/// 
+///
 /// # Returns
 /// * Combined and enhanced CPU information
 pub fn combine_cpu_info(primary: CpuInfo, secondary: CpuInfo) -> CpuInfo {
@@ -186,9 +194,21 @@ pub fn combine_cpu_info(primary: CpuInfo, secondary: CpuInfo) -> CpuInfo {
         } else {
             secondary.model
         },
-        cores: if primary.cores > 0 { primary.cores } else { secondary.cores },
-        threads: if primary.threads > 0 { primary.threads } else { secondary.threads },
-        sockets: if primary.sockets > 0 { primary.sockets } else { secondary.sockets },
+        cores: if primary.cores > 0 {
+            primary.cores
+        } else {
+            secondary.cores
+        },
+        threads: if primary.threads > 0 {
+            primary.threads
+        } else {
+            secondary.threads
+        },
+        sockets: if primary.sockets > 0 {
+            primary.sockets
+        } else {
+            secondary.sockets
+        },
         speed: if primary.speed != "Unknown" && !primary.speed.is_empty() {
             primary.speed
         } else {
@@ -198,17 +218,17 @@ pub fn combine_cpu_info(primary: CpuInfo, secondary: CpuInfo) -> CpuInfo {
 }
 
 /// Create CPU topology from CPU info
-/// 
+///
 /// # Arguments
 /// * `cpu_info` - Basic CPU information
 /// * `numa_nodes` - Number of NUMA nodes (optional)
-/// 
+///
 /// # Returns
 /// * CPU topology information
 pub fn create_cpu_topology(cpu_info: &CpuInfo, numa_nodes: Option<u32>) -> CpuTopology {
     let total_cores = cpu_info.cores * cpu_info.sockets;
     let total_threads = total_cores * cpu_info.threads;
-    
+
     CpuTopology {
         total_cores,
         total_threads,
@@ -221,10 +241,10 @@ pub fn create_cpu_topology(cpu_info: &CpuInfo, numa_nodes: Option<u32>) -> CpuTo
 }
 
 /// Create CPU summary string
-/// 
+///
 /// # Arguments
 /// * `cpu_topology` - CPU topology information
-/// 
+///
 /// # Returns
 /// * Human-readable CPU summary string
 pub fn create_cpu_summary(cpu_topology: &CpuTopology) -> String {
@@ -234,11 +254,23 @@ pub fn create_cpu_summary(cpu_topology: &CpuTopology) -> String {
         cpu_topology.sockets,
         if cpu_topology.sockets == 1 { "" } else { "s" },
         cpu_topology.cores_per_socket,
-        if cpu_topology.cores_per_socket == 1 { "" } else { "s" },
+        if cpu_topology.cores_per_socket == 1 {
+            ""
+        } else {
+            "s"
+        },
         cpu_topology.threads_per_core,
-        if cpu_topology.threads_per_core == 1 { "" } else { "s" },
+        if cpu_topology.threads_per_core == 1 {
+            ""
+        } else {
+            "s"
+        },
         cpu_topology.numa_nodes,
-        if cpu_topology.numa_nodes == 1 { "" } else { "s" }
+        if cpu_topology.numa_nodes == 1 {
+            ""
+        } else {
+            "s"
+        }
     )
 }
 
@@ -298,7 +330,7 @@ CPU MHz:                         2300.000"#;
             sockets: 1,
             speed: "Unknown".to_string(),
         };
-        
+
         let secondary = CpuInfo {
             model: "Unknown CPU".to_string(),
             cores: 0,
@@ -306,7 +338,7 @@ CPU MHz:                         2300.000"#;
             sockets: 0,
             speed: "2.3 GHz".to_string(),
         };
-        
+
         let combined = combine_cpu_info(primary, secondary);
         assert_eq!(combined.model, "Intel Core i7");
         assert_eq!(combined.cores, 8);
@@ -322,7 +354,7 @@ CPU MHz:                         2300.000"#;
             sockets: 1,
             speed: "2.3 GHz".to_string(),
         };
-        
+
         let topology = create_cpu_topology(&cpu_info, Some(1));
         assert_eq!(topology.total_cores, 8);
         assert_eq!(topology.total_threads, 16);
@@ -343,7 +375,7 @@ CPU MHz:                         2300.000"#;
             numa_nodes: 2,
             cpu_model: "Intel Xeon Gold 6226R".to_string(),
         };
-        
+
         let summary = create_cpu_summary(&topology);
         assert!(summary.contains("Intel Xeon Gold 6226R"));
         assert!(summary.contains("2 Sockets"));

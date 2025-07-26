@@ -14,8 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-pub mod http;
 pub mod file;
+pub mod http;
 
-pub use http::*;
 pub use file::*;
+pub use http::*;

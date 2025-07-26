@@ -14,12 +14,12 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-pub mod system;
 pub mod command;
-pub mod publisher;
 pub mod config;
+pub mod publisher;
+pub mod system;
 
-pub use system::*;
 pub use command::*;
-pub use publisher::*;
 pub use config::*;
+pub use publisher::*;
+pub use system::*;

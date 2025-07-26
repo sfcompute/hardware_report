@@ -15,9 +15,9 @@ limitations under the License.
 */
 
 pub mod command;
-pub mod system;
 pub mod publisher;
+pub mod system;
 
 pub use command::*;
-pub use system::*;
 pub use publisher::*;
+pub use system::*;

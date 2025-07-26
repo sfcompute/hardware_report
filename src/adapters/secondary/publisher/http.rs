@@ -20,8 +20,8 @@ use crate::domain::{HardwareReport, PublishConfig, PublishError};
 use crate::ports::DataPublisher;
 use async_trait::async_trait;
 use reqwest::Client;
-use std::time::Duration;
 use serde_json::json;
+use std::time::Duration;
 
 /// HTTP data publisher that sends reports to remote endpoints
 pub struct HttpDataPublisher {
@@ -31,7 +31,7 @@ pub struct HttpDataPublisher {
 
 impl HttpDataPublisher {
     /// Create a new HTTP data publisher
-    /// 
+    ///
     /// # Arguments
     /// * `timeout` - HTTP request timeout
     /// * `skip_tls_verify` - Whether to skip TLS certificate verification
@@ -40,59 +40,67 @@ impl HttpDataPublisher {
             .timeout(timeout)
             .danger_accept_invalid_certs(skip_tls_verify)
             .build()
-            .map_err(|e| PublishError::NetworkFailed(format!("Failed to create HTTP client: {}", e)))?;
-        
+            .map_err(|e| {
+                PublishError::NetworkFailed(format!("Failed to create HTTP client: {}", e))
+            })?;
+
         Ok(Self { client, timeout })
     }
-    
+
     /// Create with default settings
     pub fn default() -> Result<Self, PublishError> {
         Self::new(Duration::from_secs(30), false)
     }
-    
+
     /// Create a payload with labels merged in
     fn create_payload(&self, report: &HardwareReport, config: &PublishConfig) -> serde_json::Value {
-        let mut payload = serde_json::to_value(report)
-            .unwrap_or_else(|_| json!({}));
-        
+        let mut payload = serde_json::to_value(report).unwrap_or_else(|_| json!({}));
+
         // Add labels if provided
         if !config.labels.is_empty() {
             if let Some(obj) = payload.as_object_mut() {
-                obj.insert("labels".to_string(), serde_json::to_value(&config.labels).unwrap_or(json!({})));
+                obj.insert(
+                    "labels".to_string(),
+                    serde_json::to_value(&config.labels).unwrap_or(json!({})),
+                );
             }
         }
-        
+
         payload
     }
 }
 
 #[async_trait]
 impl DataPublisher for HttpDataPublisher {
-    async fn publish(&self, report: &HardwareReport, config: &PublishConfig) -> Result<(), PublishError> {
+    async fn publish(
+        &self,
+        report: &HardwareReport,
+        config: &PublishConfig,
+    ) -> Result<(), PublishError> {
         if config.endpoint.is_empty() {
-            return Err(PublishError::NetworkFailed("No endpoint URL provided".to_string()));
+            return Err(PublishError::NetworkFailed(
+                "No endpoint URL provided".to_string(),
+            ));
         }
-        
+
         let payload = self.create_payload(report, config);
-        
-        let mut request = self.client
-            .post(&config.endpoint)
-            .json(&payload);
-        
+
+        let mut request = self.client.post(&config.endpoint).json(&payload);
+
         // Add authentication if provided
         if let Some(ref token) = config.auth_token {
             request = request.header("Authorization", format!("Bearer {}", token));
         }
-        
+
         // Add content type
         request = request.header("Content-Type", "application/json");
-        
+
         // Send the request
         let response = request
             .send()
             .await
             .map_err(|e| PublishError::NetworkFailed(format!("Failed to send request: {}", e)))?;
-        
+
         // Check response status
         if response.status().is_success() {
             Ok(())
@@ -102,28 +110,34 @@ impl DataPublisher for HttpDataPublisher {
                 .text()
                 .await
                 .unwrap_or_else(|_| "Unknown error".to_string());
-                
+
             if status.as_u16() == 401 || status.as_u16() == 403 {
-                Err(PublishError::AuthenticationFailed(format!("HTTP {}: {}", status, error_text)))
+                Err(PublishError::AuthenticationFailed(format!(
+                    "HTTP {}: {}",
+                    status, error_text
+                )))
             } else {
-                Err(PublishError::NetworkFailed(format!("HTTP {}: {}", status, error_text)))
+                Err(PublishError::NetworkFailed(format!(
+                    "HTTP {}: {}",
+                    status, error_text
+                )))
             }
         }
     }
-    
+
     async fn test_connectivity(&self, config: &PublishConfig) -> Result<bool, PublishError> {
         if config.endpoint.is_empty() {
             return Ok(false);
         }
-        
+
         // Try a simple HEAD request to test connectivity
         let mut request = self.client.head(&config.endpoint);
-        
+
         // Add authentication if provided
         if let Some(ref token) = config.auth_token {
             request = request.header("Authorization", format!("Bearer {}", token));
         }
-        
+
         match request.send().await {
             Ok(response) => Ok(response.status().is_success() || response.status().as_u16() == 405), // 405 = Method Not Allowed is OK for HEAD
             Err(_) => Ok(false),
@@ -134,7 +148,7 @@ impl DataPublisher for HttpDataPublisher {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::domain::{HardwareReport, SystemSummary, SystemInfo, HardwareInfo, NetworkInfo};
+    use crate::domain::{HardwareInfo, HardwareReport, NetworkInfo, SystemInfo, SystemSummary};
     use std::collections::HashMap;
 
     fn create_test_report() -> HardwareReport {
@@ -183,7 +197,8 @@ mod tests {
                     numa_nodes: 1,
                     cpu_model: "Test CPU".to_string(),
                 },
-                cpu_summary: "Test CPU (1 Socket, 8 Cores/Socket, 2 Threads/Core, 1 NUMA Node)".to_string(),
+                cpu_summary: "Test CPU (1 Socket, 8 Cores/Socket, 2 Threads/Core, 1 NUMA Node)"
+                    .to_string(),
             },
             hostname: "test-host".to_string(),
             fqdn: "test-host.example.com".to_string(),
@@ -204,12 +219,8 @@ mod tests {
                     speed: "3200 MHz".to_string(),
                     modules: vec![],
                 },
-                storage: crate::domain::StorageInfo {
-                    devices: vec![],
-                },
-                gpus: crate::domain::GpuInfo {
-                    devices: vec![],
-                },
+                storage: crate::domain::StorageInfo { devices: vec![] },
+                gpus: crate::domain::GpuInfo { devices: vec![] },
             },
             network: NetworkInfo {
                 interfaces: vec![],
@@ -223,29 +234,29 @@ mod tests {
         let publisher = HttpDataPublisher::default();
         assert!(publisher.is_ok());
     }
-    
+
     #[tokio::test]
     async fn test_create_payload_with_labels() {
         let publisher = HttpDataPublisher::default().unwrap();
         let report = create_test_report();
-        
+
         let mut labels = HashMap::new();
         labels.insert("environment".to_string(), "test".to_string());
         labels.insert("datacenter".to_string(), "dc1".to_string());
-        
+
         let config = PublishConfig {
             endpoint: "http://example.com".to_string(),
             auth_token: None,
             skip_tls_verify: false,
             labels,
         };
-        
+
         let payload = publisher.create_payload(&report, &config);
         assert!(payload.get("labels").is_some());
         assert_eq!(payload["labels"]["environment"], "test");
         assert_eq!(payload["labels"]["datacenter"], "dc1");
     }
-    
+
     #[tokio::test]
     async fn test_empty_endpoint_error() {
         let publisher = HttpDataPublisher::default().unwrap();
@@ -256,9 +267,12 @@ mod tests {
             skip_tls_verify: false,
             labels: HashMap::new(),
         };
-        
+
         let result = publisher.publish(&report, &config).await;
         assert!(result.is_err());
-        assert!(matches!(result.unwrap_err(), PublishError::NetworkFailed(_)));
+        assert!(matches!(
+            result.unwrap_err(),
+            PublishError::NetworkFailed(_)
+        ));
     }
 }

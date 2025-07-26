@@ -138,7 +138,12 @@ async fn main() -> Result<(), Box<dyn Error>> {
                 // Extract clean size from macOS format or use as-is for Linux
                 if device.size.contains("TB (") {
                     // Extract "2.0 TB" from "2.0 TB (2001111162880 Bytes) (exactly...)"
-                    device.size.split(" (").next().unwrap_or(&device.size).to_string()
+                    device
+                        .size
+                        .split(" (")
+                        .next()
+                        .unwrap_or(&device.size)
+                        .to_string()
                 } else {
                     device.size.clone()
                 }
@@ -198,15 +203,19 @@ async fn main() -> Result<(), Box<dyn Error>> {
             let numa_info = if cfg!(target_os = "macos") || nic.numa_node.is_none() {
                 String::new() // No NUMA info on macOS or when not detected
             } else {
-                format!(" [NUMA: {}]", nic.numa_node.map_or("Unknown".to_string(), |n| n.to_string()))
+                format!(
+                    " [NUMA: {}]",
+                    nic.numa_node
+                        .map_or("Unknown".to_string(), |n| n.to_string())
+                )
             };
-            
+
             let pci_info = if cfg!(target_os = "macos") && nic.pci_id == "Unknown" {
                 String::new() // Hide PCI ID on macOS when not available
             } else {
                 format!(" ({})", nic.pci_id)
             };
-            
+
             println!(
                 "  {} - {} {}{} [Speed: {}]{}",
                 nic.name,
@@ -223,38 +232,38 @@ async fn main() -> Result<(), Box<dyn Error>> {
             let numa_info = if cfg!(target_os = "macos") || gpu.numa_node.is_none() {
                 String::new() // No NUMA info on macOS or when not detected
             } else {
-                format!(" [NUMA: {}]", gpu.numa_node.map_or("Unknown".to_string(), |n| n.to_string()))
+                format!(
+                    " [NUMA: {}]",
+                    gpu.numa_node
+                        .map_or("Unknown".to_string(), |n| n.to_string())
+                )
             };
-            
+
             let pci_info = if cfg!(target_os = "macos") && gpu.pci_id == "Unknown" {
                 String::new() // Hide PCI ID on macOS when not available
             } else {
                 format!(" ({})", gpu.pci_id)
             };
-            
+
             let memory_info = if gpu.memory != "Unknown" {
                 format!(" [{}]", gpu.memory)
             } else {
                 String::new()
             };
-            
+
             println!(
-                "  {} - {}{}{}{}", 
-                gpu.name,
-                gpu.vendor,
-                memory_info,
-                pci_info,
-                numa_info
+                "  {} - {}{}{}{}",
+                gpu.name, gpu.vendor, memory_info, pci_info, numa_info
             );
         }
-        
+
         // On macOS, show display information summary
         if cfg!(target_os = "macos") {
             println!("\nDisplays:");
             // Run system_profiler to get display info
             if let Ok(output) = std::process::Command::new("system_profiler")
                 .args(&["SPDisplaysDataType", "-detailLevel", "mini"])
-                .output() 
+                .output()
             {
                 let output_str = String::from_utf8_lossy(&output.stdout);
                 let mut in_displays_section = false;
@@ -264,7 +273,8 @@ async fn main() -> Result<(), Box<dyn Error>> {
                         in_displays_section = true;
                         continue;
                     }
-                    if in_displays_section && line.starts_with("        ") && trimmed.ends_with(":") {
+                    if in_displays_section && line.starts_with("        ") && trimmed.ends_with(":")
+                    {
                         // This is a display name
                         let display_name = trimmed.trim_end_matches(':');
                         println!("  {}", display_name);

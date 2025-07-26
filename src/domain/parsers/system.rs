@@ -16,13 +16,13 @@ limitations under the License.
 
 //! System information parsing functions
 
-use crate::domain::{SystemInfo, BiosInfo, ChassisInfo};
-use super::common::{extract_dmidecode_value, clean_value};
+use super::common::{clean_value, extract_dmidecode_value};
+use crate::domain::{BiosInfo, ChassisInfo, SystemInfo};
 
 /// Parse system information from dmidecode output
 pub fn parse_dmidecode_system_info(dmidecode_output: &str) -> Result<SystemInfo, String> {
-    let uuid = extract_dmidecode_value(dmidecode_output, "UUID")
-        .unwrap_or_else(|_| "Unknown".to_string());
+    let uuid =
+        extract_dmidecode_value(dmidecode_output, "UUID").unwrap_or_else(|_| "Unknown".to_string());
     let serial = extract_dmidecode_value(dmidecode_output, "Serial Number")
         .unwrap_or_else(|_| "Unknown".to_string());
     let product_name = extract_dmidecode_value(dmidecode_output, "Product Name")
@@ -59,8 +59,8 @@ pub fn parse_dmidecode_bios_info(dmidecode_output: &str) -> Result<BiosInfo, Str
 pub fn parse_dmidecode_chassis_info(dmidecode_output: &str) -> Result<ChassisInfo, String> {
     let manufacturer = extract_dmidecode_value(dmidecode_output, "Manufacturer")
         .unwrap_or_else(|_| "Unknown".to_string());
-    let type_ = extract_dmidecode_value(dmidecode_output, "Type")
-        .unwrap_or_else(|_| "Unknown".to_string());
+    let type_ =
+        extract_dmidecode_value(dmidecode_output, "Type").unwrap_or_else(|_| "Unknown".to_string());
     let serial = extract_dmidecode_value(dmidecode_output, "Serial Number")
         .unwrap_or_else(|_| "Unknown".to_string());
 

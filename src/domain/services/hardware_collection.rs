@@ -15,18 +15,18 @@ limitations under the License.
 */
 
 use crate::domain::{
-    HardwareReport, SystemSummary, HardwareInfo, ReportConfig, PublishConfig, 
-    ReportError, PublishError, DomainError, CpuTopology, InterfaceIPs
+    CpuTopology, DomainError, HardwareInfo, HardwareReport, InterfaceIPs, PublishConfig,
+    PublishError, ReportConfig, ReportError, SystemSummary,
 };
 use crate::ports::{
-    HardwareReportingService, SystemInfoProvider, DataPublisher, ConfigurationProvider
+    ConfigurationProvider, DataPublisher, HardwareReportingService, SystemInfoProvider,
 };
 use async_trait::async_trait;
-use std::sync::Arc;
 use std::collections::HashMap;
+use std::sync::Arc;
 
 /// Domain service that implements hardware report collection
-/// 
+///
 /// This service coordinates the collection of hardware information from various
 /// system sources and aggregates them into a complete hardware report.
 pub struct HardwareCollectionService {
@@ -40,7 +40,7 @@ pub struct HardwareCollectionService {
 
 impl HardwareCollectionService {
     /// Create a new hardware collection service
-    /// 
+    ///
     /// # Arguments
     /// * `system_provider` - Platform-specific system information provider
     /// * `data_publisher` - Publisher for sending reports to remote endpoints
@@ -56,7 +56,7 @@ impl HardwareCollectionService {
             config_provider,
         }
     }
-    
+
     /// Collect all hardware information and create summary
     async fn collect_hardware_info(&self) -> Result<(HardwareInfo, SystemSummary), ReportError> {
         // Collect all hardware components concurrently
@@ -67,22 +67,37 @@ impl HardwareCollectionService {
             self.system_provider.get_gpu_info(),
             self.system_provider.get_network_info(),
         );
-        
-        let cpu = cpu_result.map_err(|e| ReportError::GenerationFailed(format!("CPU collection failed: {}", e)))?;
-        let memory = memory_result.map_err(|e| ReportError::GenerationFailed(format!("Memory collection failed: {}", e)))?;
-        let storage = storage_result.map_err(|e| ReportError::GenerationFailed(format!("Storage collection failed: {}", e)))?;
-        let gpus = gpu_result.map_err(|e| ReportError::GenerationFailed(format!("GPU collection failed: {}", e)))?;
-        let network = network_result.map_err(|e| ReportError::GenerationFailed(format!("Network collection failed: {}", e)))?;
-        
+
+        let cpu = cpu_result
+            .map_err(|e| ReportError::GenerationFailed(format!("CPU collection failed: {}", e)))?;
+        let memory = memory_result.map_err(|e| {
+            ReportError::GenerationFailed(format!("Memory collection failed: {}", e))
+        })?;
+        let storage = storage_result.map_err(|e| {
+            ReportError::GenerationFailed(format!("Storage collection failed: {}", e))
+        })?;
+        let gpus = gpu_result
+            .map_err(|e| ReportError::GenerationFailed(format!("GPU collection failed: {}", e)))?;
+        let network = network_result.map_err(|e| {
+            ReportError::GenerationFailed(format!("Network collection failed: {}", e))
+        })?;
+
         let hardware = HardwareInfo {
             cpu: cpu.clone(),
             memory: memory.clone(),
             storage: storage.clone(),
             gpus: gpus.clone(),
         };
-        
+
         // Collect system metadata concurrently
-        let (system_info_result, bios_result, chassis_result, motherboard_result, numa_result, filesystems_result) = tokio::join!(
+        let (
+            system_info_result,
+            bios_result,
+            chassis_result,
+            motherboard_result,
+            numa_result,
+            filesystems_result,
+        ) = tokio::join!(
             self.system_provider.get_system_info(),
             self.system_provider.get_bios_info(),
             self.system_provider.get_chassis_info(),
@@ -90,32 +105,44 @@ impl HardwareCollectionService {
             self.system_provider.get_numa_topology(),
             self.system_provider.get_filesystems(),
         );
-        
-        let system_info = system_info_result.map_err(|e| ReportError::GenerationFailed(format!("System info collection failed: {}", e)))?;
-        let bios = bios_result.map_err(|e| ReportError::GenerationFailed(format!("BIOS collection failed: {}", e)))?;
-        let chassis = chassis_result.map_err(|e| ReportError::GenerationFailed(format!("Chassis collection failed: {}", e)))?;
-        let motherboard = motherboard_result.map_err(|e| ReportError::GenerationFailed(format!("Motherboard collection failed: {}", e)))?;
-        let numa_topology = numa_result.map_err(|e| ReportError::GenerationFailed(format!("NUMA collection failed: {}", e)))?;
-        let filesystems = filesystems_result.map_err(|e| ReportError::GenerationFailed(format!("Filesystem collection failed: {}", e)))?;
-        
+
+        let system_info = system_info_result.map_err(|e| {
+            ReportError::GenerationFailed(format!("System info collection failed: {}", e))
+        })?;
+        let bios = bios_result
+            .map_err(|e| ReportError::GenerationFailed(format!("BIOS collection failed: {}", e)))?;
+        let chassis = chassis_result.map_err(|e| {
+            ReportError::GenerationFailed(format!("Chassis collection failed: {}", e))
+        })?;
+        let motherboard = motherboard_result.map_err(|e| {
+            ReportError::GenerationFailed(format!("Motherboard collection failed: {}", e))
+        })?;
+        let numa_topology = numa_result
+            .map_err(|e| ReportError::GenerationFailed(format!("NUMA collection failed: {}", e)))?;
+        let filesystems = filesystems_result.map_err(|e| {
+            ReportError::GenerationFailed(format!("Filesystem collection failed: {}", e))
+        })?;
+
         // Calculate summary information
-        let summary = self.create_system_summary(
-            system_info,
-            &memory,
-            &storage,
-            &gpus,
-            &network,
-            bios,
-            chassis,
-            motherboard,
-            numa_topology,
-            filesystems,
-            &cpu,
-        ).await?;
-        
+        let summary = self
+            .create_system_summary(
+                system_info,
+                &memory,
+                &storage,
+                &gpus,
+                &network,
+                bios,
+                chassis,
+                motherboard,
+                numa_topology,
+                filesystems,
+                &cpu,
+            )
+            .await?;
+
         Ok((hardware, summary))
     }
-    
+
     /// Create system summary from collected information
     async fn create_system_summary(
         &self,
@@ -131,7 +158,6 @@ impl HardwareCollectionService {
         filesystems: Vec<String>,
         cpu: &crate::domain::CpuInfo,
     ) -> Result<SystemSummary, ReportError> {
-        
         // Calculate CPU topology
         let cpu_topology = CpuTopology {
             total_cores: cpu.cores * cpu.sockets,
@@ -142,10 +168,10 @@ impl HardwareCollectionService {
             numa_nodes: numa_topology.len() as u32,
             cpu_model: cpu.model.clone(),
         };
-        
+
         // Calculate total storage in TB
         let total_storage_tb = self.calculate_total_storage_tb(&storage.devices);
-        
+
         // Create CPU summary string
         let cpu_summary = format!(
             "{} ({} Socket{}, {} Core{}/Socket, {} Thread{}/Core, {} NUMA Node{})",
@@ -159,10 +185,10 @@ impl HardwareCollectionService {
             numa_topology.len(),
             if numa_topology.len() == 1 { "" } else { "s" }
         );
-        
+
         // Create memory config string
         let memory_config = format!("{} @ {}", memory.type_, memory.speed);
-        
+
         Ok(SystemSummary {
             system_info,
             total_memory: memory.total.clone(),
@@ -180,20 +206,22 @@ impl HardwareCollectionService {
             cpu_summary,
         })
     }
-    
+
     /// Calculate total storage in TB
     fn calculate_total_storage_tb(&self, devices: &[crate::domain::StorageDevice]) -> f64 {
-        devices.iter()
+        devices
+            .iter()
             .map(|device| self.parse_storage_size_to_bytes(&device.size))
-            .sum::<u64>() as f64 / (1024.0 * 1024.0 * 1024.0 * 1024.0) // Convert bytes to TB
+            .sum::<u64>() as f64
+            / (1024.0 * 1024.0 * 1024.0 * 1024.0) // Convert bytes to TB
     }
-    
+
     /// Format total storage as human-readable string
     fn format_total_storage(&self, devices: &[crate::domain::StorageDevice]) -> String {
         if devices.is_empty() {
             return "No storage devices found".to_string();
         }
-        
+
         let total_tb = self.calculate_total_storage_tb(devices);
         if total_tb >= 1.0 {
             format!("{:.1} TB", total_tb)
@@ -202,7 +230,7 @@ impl HardwareCollectionService {
             format!("{:.0} GB", total_gb)
         }
     }
-    
+
     /// Parse storage size string to bytes (simplified version)
     fn parse_storage_size_to_bytes(&self, size: &str) -> u64 {
         // This is a simplified implementation - in the real implementation,
@@ -222,20 +250,23 @@ impl HardwareCollectionService {
         }
         0
     }
-    
+
     /// Get hostname and FQDN
-    async fn get_network_identity(&self) -> Result<(String, String, Vec<InterfaceIPs>), ReportError> {
-        let hostname = self.system_provider.get_hostname()
-            .await
-            .map_err(|e| ReportError::GenerationFailed(format!("Hostname collection failed: {}", e)))?;
-            
-        let fqdn = self.system_provider.get_fqdn()
-            .await
-            .map_err(|e| ReportError::GenerationFailed(format!("FQDN collection failed: {}", e)))?;
-        
+    async fn get_network_identity(
+        &self,
+    ) -> Result<(String, String, Vec<InterfaceIPs>), ReportError> {
+        let hostname = self.system_provider.get_hostname().await.map_err(|e| {
+            ReportError::GenerationFailed(format!("Hostname collection failed: {}", e))
+        })?;
+
+        let fqdn =
+            self.system_provider.get_fqdn().await.map_err(|e| {
+                ReportError::GenerationFailed(format!("FQDN collection failed: {}", e))
+            })?;
+
         // For now, create empty OS IP list - this would be populated by network adapter
         let os_ip = Vec::new();
-        
+
         Ok((hostname, fqdn, os_ip))
     }
 }
@@ -244,19 +275,17 @@ impl HardwareCollectionService {
 impl HardwareReportingService for HardwareCollectionService {
     async fn generate_report(&self, _config: ReportConfig) -> Result<HardwareReport, ReportError> {
         // Collect network identity and hardware info concurrently
-        let (network_result, hardware_result) = tokio::join!(
-            self.get_network_identity(),
-            self.collect_hardware_info()
-        );
-        
+        let (network_result, hardware_result) =
+            tokio::join!(self.get_network_identity(), self.collect_hardware_info());
+
         let (hostname, fqdn, os_ip) = network_result?;
         let (hardware, summary) = hardware_result?;
-        
+
         // Get network info for the report
-        let network = self.system_provider.get_network_info()
-            .await
-            .map_err(|e| ReportError::GenerationFailed(format!("Network collection failed: {}", e)))?;
-        
+        let network = self.system_provider.get_network_info().await.map_err(|e| {
+            ReportError::GenerationFailed(format!("Network collection failed: {}", e))
+        })?;
+
         let report = HardwareReport {
             summary,
             hostname,
@@ -267,22 +296,30 @@ impl HardwareReportingService for HardwareCollectionService {
             hardware,
             network,
         };
-        
+
         Ok(report)
     }
-    
-    async fn publish_report(&self, report: &HardwareReport, config: &PublishConfig) -> Result<(), PublishError> {
+
+    async fn publish_report(
+        &self,
+        report: &HardwareReport,
+        config: &PublishConfig,
+    ) -> Result<(), PublishError> {
         self.data_publisher.publish(report, config).await
     }
-    
+
     async fn validate_dependencies(&self) -> Result<Vec<String>, ReportError> {
-        self.system_provider.get_missing_dependencies()
+        self.system_provider
+            .get_missing_dependencies()
             .await
-            .map_err(|e| ReportError::GenerationFailed(format!("Dependency validation failed: {}", e)))
+            .map_err(|e| {
+                ReportError::GenerationFailed(format!("Dependency validation failed: {}", e))
+            })
     }
-    
+
     async fn check_privileges(&self) -> Result<bool, ReportError> {
-        self.system_provider.has_required_privileges()
+        self.system_provider
+            .has_required_privileges()
             .await
             .map_err(|e| ReportError::GenerationFailed(format!("Privilege check failed: {}", e)))
     }

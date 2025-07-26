@@ -16,14 +16,16 @@ limitations under the License.
 
 //! Memory information parsing functions
 
+use super::common::{
+    bytes_to_human_readable, clean_value, extract_dmidecode_value, parse_size_to_bytes,
+};
 use crate::domain::{MemoryInfo, MemoryModule};
-use super::common::{extract_dmidecode_value, parse_size_to_bytes, bytes_to_human_readable, clean_value};
 
 /// Parse memory information from Linux free command output
-/// 
+///
 /// # Arguments
 /// * `free_output` - Raw output from free command
-/// 
+///
 /// # Returns
 /// * `Ok(String)` - Total memory size as string
 /// * `Err(String)` - Parse error description
@@ -43,10 +45,10 @@ pub fn parse_free_output(free_output: &str) -> Result<String, String> {
 }
 
 /// Parse memory modules from dmidecode memory output
-/// 
+///
 /// # Arguments
 /// * `dmidecode_output` - Raw output from dmidecode -t memory
-/// 
+///
 /// # Returns
 /// * `Ok(Vec<MemoryModule>)` - List of memory modules
 /// * `Err(String)` - Parse error description
@@ -57,7 +59,7 @@ pub fn parse_dmidecode_memory(dmidecode_output: &str) -> Result<Vec<MemoryModule
 
     for line in dmidecode_output.lines() {
         let trimmed = line.trim();
-        
+
         if trimmed.starts_with("Memory Device") {
             // Save previous module if it exists
             if let Some(module) = current_module.take() {
@@ -65,7 +67,7 @@ pub fn parse_dmidecode_memory(dmidecode_output: &str) -> Result<Vec<MemoryModule
                     modules.push(module);
                 }
             }
-            
+
             // Start new module
             current_module = Some(MemoryModule {
                 size: "Unknown".to_string(),
@@ -78,11 +80,11 @@ pub fn parse_dmidecode_memory(dmidecode_output: &str) -> Result<Vec<MemoryModule
             in_memory_device = true;
             continue;
         }
-        
+
         if !in_memory_device {
             continue;
         }
-        
+
         if let Some(ref mut module) = current_module {
             if trimmed.starts_with("Size:") {
                 let size = trimmed.split(':').nth(1).unwrap_or("Unknown").trim();
@@ -94,35 +96,37 @@ pub fn parse_dmidecode_memory(dmidecode_output: &str) -> Result<Vec<MemoryModule
             } else if trimmed.starts_with("Speed:") {
                 module.speed = clean_value(trimmed.split(':').nth(1).unwrap_or("Unknown").trim());
             } else if trimmed.starts_with("Locator:") {
-                module.location = clean_value(trimmed.split(':').nth(1).unwrap_or("Unknown").trim());
+                module.location =
+                    clean_value(trimmed.split(':').nth(1).unwrap_or("Unknown").trim());
             } else if trimmed.starts_with("Manufacturer:") {
-                module.manufacturer = clean_value(trimmed.split(':').nth(1).unwrap_or("Unknown").trim());
+                module.manufacturer =
+                    clean_value(trimmed.split(':').nth(1).unwrap_or("Unknown").trim());
             } else if trimmed.starts_with("Serial Number:") {
                 module.serial = clean_value(trimmed.split(':').nth(1).unwrap_or("Unknown").trim());
             }
         }
-        
+
         // End of section
         if trimmed.is_empty() {
             in_memory_device = false;
         }
     }
-    
+
     // Save last module
     if let Some(module) = current_module {
         if module.size != "No Module Installed" && module.size != "Unknown" {
             modules.push(module);
         }
     }
-    
+
     Ok(modules)
 }
 
 /// Parse memory information from macOS system_profiler output
-/// 
+///
 /// # Arguments
 /// * `system_profiler_output` - Raw output from system_profiler SPMemoryDataType
-/// 
+///
 /// # Returns
 /// * `Ok(MemoryInfo)` - Parsed memory information
 /// * `Err(String)` - Parse error description
@@ -134,9 +138,14 @@ pub fn parse_macos_memory_info(system_profiler_output: &str) -> Result<MemoryInf
 
     for line in system_profiler_output.lines() {
         let trimmed = line.trim();
-        
+
         if trimmed.starts_with("Memory:") {
-            total = trimmed.split(':').nth(1).unwrap_or("Unknown").trim().to_string();
+            total = trimmed
+                .split(':')
+                .nth(1)
+                .unwrap_or("Unknown")
+                .trim()
+                .to_string();
         } else if trimmed.starts_with("Type:") {
             type_ = clean_value(trimmed.split(':').nth(1).unwrap_or("Unknown").trim());
         } else if trimmed.starts_with("Manufacturer:") {
@@ -156,7 +165,11 @@ pub fn parse_macos_memory_info(system_profiler_output: &str) -> Result<MemoryInf
         });
     }
 
-    let speed = if type_.contains("LPDDR") { "Integrated".to_string() } else { "Unknown".to_string() };
+    let speed = if type_.contains("LPDDR") {
+        "Integrated".to_string()
+    } else {
+        "Unknown".to_string()
+    };
 
     Ok(MemoryInfo {
         total,
@@ -167,10 +180,10 @@ pub fn parse_macos_memory_info(system_profiler_output: &str) -> Result<MemoryInf
 }
 
 /// Create memory configuration string
-/// 
+///
 /// # Arguments
 /// * `memory_info` - Memory information
-/// 
+///
 /// # Returns
 /// * Memory configuration string (e.g., "DDR4 @ 3200 MHz")
 pub fn create_memory_config_string(memory_info: &MemoryInfo) -> String {
@@ -178,17 +191,18 @@ pub fn create_memory_config_string(memory_info: &MemoryInfo) -> String {
 }
 
 /// Calculate total memory from modules
-/// 
+///
 /// # Arguments
 /// * `modules` - List of memory modules
-/// 
+///
 /// # Returns
 /// * Total memory as human-readable string
 pub fn calculate_total_memory_from_modules(modules: &[MemoryModule]) -> String {
-    let total_bytes: u64 = modules.iter()
+    let total_bytes: u64 = modules
+        .iter()
         .map(|module| parse_size_to_bytes(&module.size).unwrap_or(0))
         .sum();
-    
+
     if total_bytes > 0 {
         bytes_to_human_readable(total_bytes)
     } else {
@@ -197,17 +211,17 @@ pub fn calculate_total_memory_from_modules(modules: &[MemoryModule]) -> String {
 }
 
 /// Determine common memory type from modules
-/// 
+///
 /// # Arguments
 /// * `modules` - List of memory modules
-/// 
+///
 /// # Returns
 /// * Common memory type or "Mixed" if different types
 pub fn determine_memory_type(modules: &[MemoryModule]) -> String {
     if modules.is_empty() {
         return "Unknown".to_string();
     }
-    
+
     let first_type = &modules[0].type_;
     if modules.iter().all(|m| m.type_ == *first_type) {
         first_type.clone()
@@ -217,17 +231,17 @@ pub fn determine_memory_type(modules: &[MemoryModule]) -> String {
 }
 
 /// Determine common memory speed from modules
-/// 
+///
 /// # Arguments
 /// * `modules` - List of memory modules
-/// 
+///
 /// # Returns
 /// * Common memory speed or "Mixed" if different speeds
 pub fn determine_memory_speed(modules: &[MemoryModule]) -> String {
     if modules.is_empty() {
         return "Unknown".to_string();
     }
-    
+
     let first_speed = &modules[0].speed;
     if modules.iter().all(|m| m.speed == *first_speed) {
         first_speed.clone()
@@ -287,7 +301,7 @@ Swap:        2097152           0     2097152"#;
             speed: "3200 MT/s".to_string(),
             modules: vec![],
         };
-        
+
         let config = create_memory_config_string(&memory_info);
         assert_eq!(config, "DDR4 @ 3200 MT/s");
     }
@@ -312,7 +326,7 @@ Swap:        2097152           0     2097152"#;
                 serial: "456".to_string(),
             },
         ];
-        
+
         assert_eq!(determine_memory_type(&modules), "DDR4");
         assert_eq!(determine_memory_speed(&modules), "3200 MT/s");
     }

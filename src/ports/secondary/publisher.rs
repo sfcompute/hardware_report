@@ -19,27 +19,31 @@ use async_trait::async_trait;
 use std::path::Path;
 
 /// Secondary port - Data publishing abstraction
-/// 
+///
 /// This interface abstracts how hardware reports are published/stored,
 /// allowing for different implementations (HTTP, file system, databases, etc.)
 #[async_trait]
 pub trait DataPublisher: Send + Sync {
     /// Publish a hardware report to a remote endpoint
-    /// 
+    ///
     /// # Arguments
     /// * `report` - The hardware report to publish
     /// * `config` - Publishing configuration
-    /// 
+    ///
     /// # Returns
     /// * `Ok(())` - Report successfully published
     /// * `Err(PublishError)` - Error occurred during publishing
-    async fn publish(&self, report: &HardwareReport, config: &PublishConfig) -> Result<(), PublishError>;
-    
+    async fn publish(
+        &self,
+        report: &HardwareReport,
+        config: &PublishConfig,
+    ) -> Result<(), PublishError>;
+
     /// Test connectivity to the publishing endpoint
-    /// 
+    ///
     /// # Arguments
     /// * `config` - Publishing configuration
-    /// 
+    ///
     /// # Returns
     /// * `Ok(bool)` - true if endpoint is reachable
     /// * `Err(PublishError)` - Error testing connectivity
@@ -47,57 +51,57 @@ pub trait DataPublisher: Send + Sync {
 }
 
 /// Secondary port - File repository abstraction
-/// 
+///
 /// This interface abstracts file-based storage of hardware reports
 #[async_trait]
 pub trait FileRepository: Send + Sync {
     /// Save hardware report to a file in JSON format
-    /// 
+    ///
     /// # Arguments
     /// * `report` - The hardware report to save
     /// * `path` - File path to save to
-    /// 
+    ///
     /// # Returns
     /// * `Ok(())` - Report successfully saved
     /// * `Err(PublishError)` - Error occurred during save
     async fn save_json(&self, report: &HardwareReport, path: &Path) -> Result<(), PublishError>;
-    
+
     /// Save hardware report to a file in TOML format
-    /// 
+    ///
     /// # Arguments
     /// * `report` - The hardware report to save
     /// * `path` - File path to save to
-    /// 
+    ///
     /// # Returns
     /// * `Ok(())` - Report successfully saved
     /// * `Err(PublishError)` - Error occurred during save
     async fn save_toml(&self, report: &HardwareReport, path: &Path) -> Result<(), PublishError>;
-    
+
     /// Load hardware report from a JSON file
-    /// 
+    ///
     /// # Arguments
     /// * `path` - File path to load from
-    /// 
+    ///
     /// # Returns
     /// * `Ok(HardwareReport)` - Loaded hardware report
     /// * `Err(PublishError)` - Error occurred during load
     async fn load_json(&self, path: &Path) -> Result<HardwareReport, PublishError>;
-    
+
     /// Load hardware report from a TOML file
-    /// 
+    ///
     /// # Arguments
     /// * `path` - File path to load from
-    /// 
+    ///
     /// # Returns
     /// * `Ok(HardwareReport)` - Loaded hardware report
     /// * `Err(PublishError)` - Error occurred during load
     async fn load_toml(&self, path: &Path) -> Result<HardwareReport, PublishError>;
-    
+
     /// Check if file exists
-    /// 
+    ///
     /// # Arguments
     /// * `path` - File path to check
-    /// 
+    ///
     /// # Returns
     /// * `Ok(bool)` - true if file exists
     /// * `Err(PublishError)` - Error checking file existence

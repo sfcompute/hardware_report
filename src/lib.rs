@@ -15,23 +15,23 @@ limitations under the License.
 */
 
 //! Hardware Report Library
-//! 
+//!
 //! This library provides hardware information collection capabilities using a
 //! Ports and Adapters (Hexagonal) architecture for maintainability and testability.
-//! 
+//!
 //! # Architecture
-//! 
+//!
 //! - **Domain**: Core business logic and entities
 //! - **Ports**: Interfaces for external interactions
 //! - **Adapters**: Platform-specific implementations
-//! 
+//!
 //! # Usage
-//! 
+//!
 //! ## As a Library
-//! 
+//!
 //! ```rust,no_run
 //! use hardware_report::{HardwareReportingService, ReportConfig};
-//! 
+//!
 //! async fn example() -> Result<(), Box<dyn std::error::Error>> {
 //!     // Create service with platform-specific adapters
 //!     let service = hardware_report::create_service(None).await?;
@@ -44,14 +44,14 @@ limitations under the License.
 //!     Ok(())
 //! }
 //! ```
-//! 
+//!
 //! ## Legacy Compatibility
-//! 
+//!
 //! The library maintains backward compatibility with the original `ServerInfo` API:
-//! 
+//!
 //! ```rust,no_run
 //! use hardware_report::ServerInfo;
-//! 
+//!
 //! fn legacy_example() -> Result<(), Box<dyn std::error::Error>> {
 //!     let server_info = ServerInfo::collect()?;
 //!     println!("Hostname: {}", server_info.hostname);
@@ -60,25 +60,25 @@ limitations under the License.
 //! ```
 
 // New Ports and Adapters Architecture
-pub mod domain;
-pub mod ports;
 pub mod adapters;
 pub mod container;
+pub mod domain;
+pub mod ports;
 
 // Re-export public API - specific exports to avoid conflicts with legacy types
 // Only export new types that don't conflict with legacy compatibility layer
-pub use domain::{ReportConfig, PublishConfig, ReportError, PublishError};
-pub use ports::{
-    HardwareReportingService, SystemInfoProvider, CommandExecutor, DataPublisher, 
-    FileRepository, ConfigurationProvider, OutputFormat
-};
 pub use adapters::{
-    UnixCommandExecutor, LinuxSystemInfoProvider, MacOSSystemInfoProvider,
-    HttpDataPublisher, FileSystemRepository, FileDataPublisher
+    FileDataPublisher, FileSystemRepository, HttpDataPublisher, LinuxSystemInfoProvider,
+    MacOSSystemInfoProvider, UnixCommandExecutor,
 };
-pub use container::{ServiceContainer, ContainerConfig, ContainerConfigBuilder};
+pub use container::{ContainerConfig, ContainerConfigBuilder, ServiceContainer};
+pub use domain::{PublishConfig, PublishError, ReportConfig, ReportError};
+pub use ports::{
+    CommandExecutor, ConfigurationProvider, DataPublisher, FileRepository,
+    HardwareReportingService, OutputFormat, SystemInfoProvider,
+};
 
-// Re-export domain entities under a namespace to avoid conflicts  
+// Re-export domain entities under a namespace to avoid conflicts
 pub use domain::HardwareReport as NewHardwareReport;
 pub mod new_domain {
     pub use crate::domain::*;
@@ -517,24 +517,45 @@ impl ServerInfo {
         let mut serial = "Unknown S/N".to_string();
 
         // Get hardware information from system_profiler
-        if let Ok(output) = Command::new("system_profiler").args(&["SPHardwareDataType"]).output() {
+        if let Ok(output) = Command::new("system_profiler")
+            .args(&["SPHardwareDataType"])
+            .output()
+        {
             let output_str = String::from_utf8_lossy(&output.stdout);
-            
+
             for line in output_str.lines() {
                 let trimmed = line.trim();
                 if trimmed.starts_with("Model Identifier:") {
-                    product_name = trimmed.split(":").nth(1).unwrap_or("Unknown Product").trim().to_string();
+                    product_name = trimmed
+                        .split(":")
+                        .nth(1)
+                        .unwrap_or("Unknown Product")
+                        .trim()
+                        .to_string();
                 } else if trimmed.starts_with("System Firmware Version:") {
-                    version = trimmed.split(":").nth(1).unwrap_or("Unknown Version").trim().to_string();
+                    version = trimmed
+                        .split(":")
+                        .nth(1)
+                        .unwrap_or("Unknown Version")
+                        .trim()
+                        .to_string();
                 } else if trimmed.starts_with("Serial Number (system):") {
-                    serial = trimmed.split(":").nth(1).unwrap_or("Unknown S/N").trim().to_string();
+                    serial = trimmed
+                        .split(":")
+                        .nth(1)
+                        .unwrap_or("Unknown S/N")
+                        .trim()
+                        .to_string();
                 }
             }
         }
 
         // Try to get MLB (Main Logic Board) serial from ioreg if system serial not found
         if serial == "Unknown S/N" {
-            if let Ok(output) = Command::new("ioreg").args(&["-c", "IOPlatformExpertDevice", "-d", "2"]).output() {
+            if let Ok(output) = Command::new("ioreg")
+                .args(&["-c", "IOPlatformExpertDevice", "-d", "2"])
+                .output()
+            {
                 let output_str = String::from_utf8_lossy(&output.stdout);
                 for line in output_str.lines() {
                     if line.contains("\"serial-number\"") {
@@ -630,7 +651,7 @@ impl ServerInfo {
         }
 
         let size_str = size.replace(" ", "").to_uppercase();
-        
+
         // Handle both Linux format (123G) and macOS format (123 GB)
         let re = Regex::new(r"(\d+(?:\.\d+)?)\s*(B|KB?|MB?|GB?|TB?|BYTES?)$")?;
 
@@ -1012,14 +1033,34 @@ impl ServerInfo {
         for line in output_str.lines() {
             let trimmed = line.trim();
             if trimmed.starts_with("Hardware UUID:") {
-                uuid = trimmed.split(":").nth(1).unwrap_or("Unknown").trim().to_string();
+                uuid = trimmed
+                    .split(":")
+                    .nth(1)
+                    .unwrap_or("Unknown")
+                    .trim()
+                    .to_string();
             } else if trimmed.starts_with("Serial Number (system):") {
-                serial = trimmed.split(":").nth(1).unwrap_or("Unknown").trim().to_string();
+                serial = trimmed
+                    .split(":")
+                    .nth(1)
+                    .unwrap_or("Unknown")
+                    .trim()
+                    .to_string();
             } else if trimmed.starts_with("Model Name:") {
-                model = trimmed.split(":").nth(1).unwrap_or("Mac").trim().to_string();
+                model = trimmed
+                    .split(":")
+                    .nth(1)
+                    .unwrap_or("Mac")
+                    .trim()
+                    .to_string();
             } else if trimmed.starts_with("Chip:") {
                 // Also extract chip info for newer Macs that don't show "Processor Name:"
-                let chip_name = trimmed.split(":").nth(1).unwrap_or("Unknown").trim().to_string();
+                let chip_name = trimmed
+                    .split(":")
+                    .nth(1)
+                    .unwrap_or("Unknown")
+                    .trim()
+                    .to_string();
                 if !chip_name.is_empty() && chip_name != "Unknown" {
                     model = format!("{} ({})", model, chip_name);
                 }
@@ -1241,7 +1282,12 @@ impl ServerInfo {
         for line in output_str.lines() {
             let trimmed = line.trim();
             if trimmed.starts_with("System Firmware Version:") {
-                firmware_version = trimmed.split(":").nth(1).unwrap_or("N/A").trim().to_string();
+                firmware_version = trimmed
+                    .split(":")
+                    .nth(1)
+                    .unwrap_or("N/A")
+                    .trim()
+                    .to_string();
                 break;
             }
         }
@@ -1327,10 +1373,18 @@ impl ServerInfo {
         for line in output_str.lines() {
             let trimmed = line.trim();
             if trimmed.starts_with("Serial Number (system):") {
-                serial = trimmed.split(":").nth(1).unwrap_or("Unknown S/N").trim().to_string();
+                serial = trimmed
+                    .split(":")
+                    .nth(1)
+                    .unwrap_or("Unknown S/N")
+                    .trim()
+                    .to_string();
             } else if trimmed.starts_with("Model Name:") {
                 let model = trimmed.split(":").nth(1).unwrap_or("").trim().to_string();
-                if model.contains("Mac Pro") || model.contains("Mac Studio") || model.contains("iMac Pro") {
+                if model.contains("Mac Pro")
+                    || model.contains("Mac Studio")
+                    || model.contains("iMac Pro")
+                {
                     chassis_type = "Desktop".to_string();
                 } else if model.contains("iMac") {
                     chassis_type = "All-in-One".to_string();
@@ -1438,7 +1492,12 @@ impl ServerInfo {
             let output_str = String::from_utf8_lossy(&output.stdout);
             for line in output_str.lines() {
                 if line.trim().starts_with("Processor Name:") || line.trim().starts_with("Chip:") {
-                    cpu_model = line.split(":").nth(1).unwrap_or("Unknown").trim().to_string();
+                    cpu_model = line
+                        .split(":")
+                        .nth(1)
+                        .unwrap_or("Unknown")
+                        .trim()
+                        .to_string();
                     break;
                 }
             }
@@ -1678,7 +1737,11 @@ impl ServerInfo {
     fn collect_cpu_info_macos() -> Result<CpuInfo, Box<dyn Error>> {
         let cores = Self::get_macos_cpu_cores().unwrap_or(0);
         let logical_cores = Self::get_macos_logical_cpu_cores().unwrap_or(cores);
-        let threads = if logical_cores > cores { logical_cores / cores } else { 1 };
+        let threads = if logical_cores > cores {
+            logical_cores / cores
+        } else {
+            1
+        };
         let speed = Self::get_macos_cpu_speed().unwrap_or("Unknown".to_string());
 
         // Get CPU model using system_profiler
@@ -1690,8 +1753,15 @@ impl ServerInfo {
                 let output_str = String::from_utf8(output.stdout)?;
                 // Extract processor name from system_profiler output
                 for line in output_str.lines() {
-                    if line.trim().starts_with("Processor Name:") || line.trim().starts_with("Chip:") {
-                        let cpu_name = line.split(":").nth(1).unwrap_or("Unknown").trim().to_string();
+                    if line.trim().starts_with("Processor Name:")
+                        || line.trim().starts_with("Chip:")
+                    {
+                        let cpu_name = line
+                            .split(":")
+                            .nth(1)
+                            .unwrap_or("Unknown")
+                            .trim()
+                            .to_string();
                         return Ok(CpuInfo {
                             model: cpu_name,
                             cores,
@@ -1716,21 +1786,29 @@ impl ServerInfo {
     }
 
     fn get_macos_cpu_cores() -> Result<u32, Box<dyn Error>> {
-        let output = Command::new("sysctl").args(&["-n", "hw.physicalcpu"]).output()?;
+        let output = Command::new("sysctl")
+            .args(&["-n", "hw.physicalcpu"])
+            .output()?;
         let cores_str = String::from_utf8(output.stdout)?;
         Ok(cores_str.trim().parse().unwrap_or(0))
     }
 
     fn get_macos_logical_cpu_cores() -> Result<u32, Box<dyn Error>> {
-        let output = Command::new("sysctl").args(&["-n", "hw.logicalcpu"]).output()?;
+        let output = Command::new("sysctl")
+            .args(&["-n", "hw.logicalcpu"])
+            .output()?;
         let cores_str = String::from_utf8(output.stdout)?;
         Ok(cores_str.trim().parse().unwrap_or(0))
     }
 
     fn get_macos_cpu_speed() -> Result<String, Box<dyn Error>> {
         // Try different sysctl keys for CPU frequency
-        let freq_keys = ["hw.cpufrequency_max", "hw.cpufrequency", "machdep.cpu.max_basic"];
-        
+        let freq_keys = [
+            "hw.cpufrequency_max",
+            "hw.cpufrequency",
+            "machdep.cpu.max_basic",
+        ];
+
         for key in &freq_keys {
             if let Ok(output) = Command::new("sysctl").args(&["-n", key]).output() {
                 let freq_str = String::from_utf8_lossy(&output.stdout);
@@ -1740,7 +1818,7 @@ impl ServerInfo {
                 }
             }
         }
-        
+
         // Fallback: try to get from system_profiler
         if let Ok(output) = Command::new("system_profiler")
             .args(&["SPHardwareDataType", "-detailLevel", "basic"])
@@ -1749,11 +1827,16 @@ impl ServerInfo {
             let output_str = String::from_utf8_lossy(&output.stdout);
             for line in output_str.lines() {
                 if line.trim().starts_with("Processor Speed:") {
-                    return Ok(line.split(":").nth(1).unwrap_or("Unknown").trim().to_string());
+                    return Ok(line
+                        .split(":")
+                        .nth(1)
+                        .unwrap_or("Unknown")
+                        .trim()
+                        .to_string());
                 }
             }
         }
-        
+
         Ok("Unknown".to_string())
     }
 
@@ -1830,7 +1913,7 @@ impl ServerInfo {
         let total = Self::get_total_memory_macos()?;
         let mut type_ = "Unknown".to_string();
         let mut manufacturer = "Unknown".to_string();
-        
+
         // Use system_profiler to get memory details
         let output = match Command::new("system_profiler")
             .args(&["SPMemoryDataType", "-detailLevel", "full"])
@@ -1848,7 +1931,7 @@ impl ServerInfo {
         };
 
         let output_str = String::from_utf8(output.stdout)?;
-        
+
         // For Apple Silicon Macs, memory info is at the top level
         for line in output_str.lines() {
             let trimmed = line.trim();
@@ -1856,9 +1939,19 @@ impl ServerInfo {
                 // Extract just the size, we already have the total
                 continue;
             } else if trimmed.starts_with("Type:") {
-                type_ = trimmed.split(":").nth(1).unwrap_or("Unknown").trim().to_string();
+                type_ = trimmed
+                    .split(":")
+                    .nth(1)
+                    .unwrap_or("Unknown")
+                    .trim()
+                    .to_string();
             } else if trimmed.starts_with("Manufacturer:") {
-                manufacturer = trimmed.split(":").nth(1).unwrap_or("Unknown").trim().to_string();
+                manufacturer = trimmed
+                    .split(":")
+                    .nth(1)
+                    .unwrap_or("Unknown")
+                    .trim()
+                    .to_string();
             }
         }
 
@@ -1880,7 +1973,7 @@ impl ServerInfo {
 
             for line in output_str.lines() {
                 let trimmed = line.trim();
-                
+
                 if trimmed.starts_with("DIMM") || trimmed.starts_with("BANK") {
                     // Save previous module if exists
                     if let Some(module) = current_module.take() {
@@ -1897,15 +1990,40 @@ impl ServerInfo {
                     });
                 } else if let Some(ref mut module) = current_module {
                     if trimmed.starts_with("Size:") {
-                        module.size = trimmed.split(":").nth(1).unwrap_or("Unknown").trim().to_string();
+                        module.size = trimmed
+                            .split(":")
+                            .nth(1)
+                            .unwrap_or("Unknown")
+                            .trim()
+                            .to_string();
                     } else if trimmed.starts_with("Type:") {
-                        module.type_ = trimmed.split(":").nth(1).unwrap_or("Unknown").trim().to_string();
+                        module.type_ = trimmed
+                            .split(":")
+                            .nth(1)
+                            .unwrap_or("Unknown")
+                            .trim()
+                            .to_string();
                     } else if trimmed.starts_with("Speed:") {
-                        module.speed = trimmed.split(":").nth(1).unwrap_or("Unknown").trim().to_string();
+                        module.speed = trimmed
+                            .split(":")
+                            .nth(1)
+                            .unwrap_or("Unknown")
+                            .trim()
+                            .to_string();
                     } else if trimmed.starts_with("Manufacturer:") {
-                        module.manufacturer = trimmed.split(":").nth(1).unwrap_or("Unknown").trim().to_string();
+                        module.manufacturer = trimmed
+                            .split(":")
+                            .nth(1)
+                            .unwrap_or("Unknown")
+                            .trim()
+                            .to_string();
                     } else if trimmed.starts_with("Serial Number:") {
-                        module.serial = trimmed.split(":").nth(1).unwrap_or("Unknown").trim().to_string();
+                        module.serial = trimmed
+                            .split(":")
+                            .nth(1)
+                            .unwrap_or("Unknown")
+                            .trim()
+                            .to_string();
                     }
                 }
             }
@@ -1938,7 +2056,10 @@ impl ServerInfo {
         };
 
         let speed = if speed_set.len() == 1 {
-            speed_set.into_iter().next().unwrap_or("Integrated".to_string())
+            speed_set
+                .into_iter()
+                .next()
+                .unwrap_or("Integrated".to_string())
         } else if speed_set.is_empty() {
             "Integrated".to_string()
         } else {
@@ -1964,7 +2085,9 @@ impl ServerInfo {
 
     /// Retrieves the total memory size on macOS using sysctl.
     fn get_total_memory_macos() -> Result<String, Box<dyn Error>> {
-        let output = Command::new("sysctl").args(&["-n", "hw.memsize"]).output()?;
+        let output = Command::new("sysctl")
+            .args(&["-n", "hw.memsize"])
+            .output()?;
         let memsize_str = String::from_utf8(output.stdout)?;
         if let Ok(bytes) = memsize_str.trim().parse::<u64>() {
             let gb = bytes as f64 / (1024.0 * 1024.0 * 1024.0);
@@ -2054,7 +2177,7 @@ impl ServerInfo {
 
             while i < lines.len() {
                 let line = lines[i].trim();
-                
+
                 if line.starts_with("Physical Drive:") {
                     i += 1;
                     let mut device_name = "Unknown".to_string();
@@ -2065,11 +2188,26 @@ impl ServerInfo {
                     while i < lines.len() && lines[i].starts_with("        ") {
                         let detail_line = lines[i].trim();
                         if detail_line.starts_with("Device Name:") {
-                            device_name = detail_line.split(":").nth(1).unwrap_or("Unknown").trim().to_string();
+                            device_name = detail_line
+                                .split(":")
+                                .nth(1)
+                                .unwrap_or("Unknown")
+                                .trim()
+                                .to_string();
                         } else if detail_line.starts_with("Medium Type:") {
-                            medium_type = detail_line.split(":").nth(1).unwrap_or("Unknown").trim().to_string();
+                            medium_type = detail_line
+                                .split(":")
+                                .nth(1)
+                                .unwrap_or("Unknown")
+                                .trim()
+                                .to_string();
                         } else if detail_line.starts_with("Protocol:") {
-                            protocol = detail_line.split(":").nth(1).unwrap_or("Unknown").trim().to_string();
+                            protocol = detail_line
+                                .split(":")
+                                .nth(1)
+                                .unwrap_or("Unknown")
+                                .trim()
+                                .to_string();
                         }
                         i += 1;
                     }
@@ -2078,14 +2216,20 @@ impl ServerInfo {
                     let start_search = i.saturating_sub(15);
                     for j in start_search..i {
                         if j < lines.len() && lines[j].trim().starts_with("Capacity:") {
-                            capacity = lines[j].trim().split(":").nth(1).unwrap_or("2 TB").trim().to_string();
+                            capacity = lines[j]
+                                .trim()
+                                .split(":")
+                                .nth(1)
+                                .unwrap_or("2 TB")
+                                .trim()
+                                .to_string();
                             break;
                         }
                     }
 
                     if !physical_drives.contains(&device_name) && device_name != "Unknown" {
                         physical_drives.insert(device_name.clone());
-                        
+
                         devices.push(StorageDevice {
                             name: device_name.clone(),
                             type_: medium_type.to_lowercase(),
@@ -2102,47 +2246,70 @@ impl ServerInfo {
         // If no drives found via system_profiler, fall back to diskutil
         if devices.is_empty() {
             if let Ok(diskutil_output) = Command::new("diskutil").args(&["list"]).output() {
-            let diskutil_str = String::from_utf8_lossy(&diskutil_output.stdout);
-            
-            for line in diskutil_str.lines() {
-                if line.contains("(internal, physical)") {
-                    // Extract disk identifier (e.g., "/dev/disk0")
-                    if let Some(disk_path) = line.split_whitespace().next() {
-                        if let Some(disk_id) = disk_path.strip_prefix("/dev/") {
-                            // Get detailed info for this physical disk
-                            if let Ok(info_output) = Command::new("diskutil").args(&["info", disk_id]).output() {
-                                let info_str = String::from_utf8_lossy(&info_output.stdout);
-                                let mut device_name = "Unknown".to_string();
-                                let mut total_size = "Unknown".to_string();
-                                let mut device_location = "Unknown".to_string();
-                                let mut solid_state = false;
+                let diskutil_str = String::from_utf8_lossy(&diskutil_output.stdout);
 
-                                for info_line in info_str.lines() {
-                                    let trimmed = info_line.trim();
-                                    if trimmed.starts_with("Device / Media Name:") {
-                                        device_name = trimmed.split(":").nth(1).unwrap_or("Unknown").trim().to_string();
-                                    } else if trimmed.starts_with("Total Size:") || trimmed.starts_with("Disk Size:") {
-                                        // Extract size (e.g., "2.0 TB (2000398934016 Bytes)")
-                                        total_size = trimmed.split(":").nth(1).unwrap_or("Unknown").trim().to_string();
-                                    } else if trimmed.starts_with("Device Location:") {
-                                        device_location = trimmed.split(":").nth(1).unwrap_or("Unknown").trim().to_string();
-                                    } else if trimmed.starts_with("Solid State:") {
-                                        solid_state = trimmed.contains("Yes");
+                for line in diskutil_str.lines() {
+                    if line.contains("(internal, physical)") {
+                        // Extract disk identifier (e.g., "/dev/disk0")
+                        if let Some(disk_path) = line.split_whitespace().next() {
+                            if let Some(disk_id) = disk_path.strip_prefix("/dev/") {
+                                // Get detailed info for this physical disk
+                                if let Ok(info_output) =
+                                    Command::new("diskutil").args(&["info", disk_id]).output()
+                                {
+                                    let info_str = String::from_utf8_lossy(&info_output.stdout);
+                                    let mut device_name = "Unknown".to_string();
+                                    let mut total_size = "Unknown".to_string();
+                                    let mut device_location = "Unknown".to_string();
+                                    let mut solid_state = false;
+
+                                    for info_line in info_str.lines() {
+                                        let trimmed = info_line.trim();
+                                        if trimmed.starts_with("Device / Media Name:") {
+                                            device_name = trimmed
+                                                .split(":")
+                                                .nth(1)
+                                                .unwrap_or("Unknown")
+                                                .trim()
+                                                .to_string();
+                                        } else if trimmed.starts_with("Total Size:")
+                                            || trimmed.starts_with("Disk Size:")
+                                        {
+                                            // Extract size (e.g., "2.0 TB (2000398934016 Bytes)")
+                                            total_size = trimmed
+                                                .split(":")
+                                                .nth(1)
+                                                .unwrap_or("Unknown")
+                                                .trim()
+                                                .to_string();
+                                        } else if trimmed.starts_with("Device Location:") {
+                                            device_location = trimmed
+                                                .split(":")
+                                                .nth(1)
+                                                .unwrap_or("Unknown")
+                                                .trim()
+                                                .to_string();
+                                        } else if trimmed.starts_with("Solid State:") {
+                                            solid_state = trimmed.contains("Yes");
+                                        }
                                     }
-                                }
 
-                                // Create device entry
-                                devices.push(StorageDevice {
-                                    name: device_name.clone(),
-                                    type_: if solid_state { "ssd".to_string() } else { "hdd".to_string() },
-                                    size: total_size,
-                                    model: format!("{} ({})", device_name, device_location),
-                                });
+                                    // Create device entry
+                                    devices.push(StorageDevice {
+                                        name: device_name.clone(),
+                                        type_: if solid_state {
+                                            "ssd".to_string()
+                                        } else {
+                                            "hdd".to_string()
+                                        },
+                                        size: total_size,
+                                        model: format!("{} ({})", device_name, device_location),
+                                    });
+                                }
                             }
                         }
                     }
                 }
-            }
             }
         }
 
@@ -2212,39 +2379,48 @@ impl ServerInfo {
 
         for line in output_str.lines() {
             let trimmed = line.trim();
-            
+
             // Look for actual GPU entries (indented exactly 4 spaces and ending with colon)
             // Skip display entries and other sub-sections
-            if line.starts_with("    ") && !line.starts_with("      ") && 
-               trimmed.ends_with(":") && 
-               !trimmed.starts_with("Displays:") && 
-               !trimmed.starts_with("Graphics/Displays:") &&
-               !trimmed.contains("Display") {
-                
+            if line.starts_with("    ")
+                && !line.starts_with("      ")
+                && trimmed.ends_with(":")
+                && !trimmed.starts_with("Displays:")
+                && !trimmed.starts_with("Graphics/Displays:")
+                && !trimmed.contains("Display")
+            {
                 // Save previous GPU
                 if let Some(gpu) = current_gpu.take() {
                     devices.push(gpu);
                     index += 1;
                 }
-                
+
                 let name = trimmed.trim_end_matches(':').to_string();
-                
+
                 current_gpu = Some(GpuDevice {
                     index,
                     name: name.clone(),
                     uuid: format!("macOS-GPU-{}", index),
                     memory: "Unknown".to_string(),
-                    pci_id: if name.contains("Apple") || name.contains("M1") || name.contains("M2") || 
-                            name.contains("M3") || name.contains("M4") { 
-                        "Apple Fabric (Integrated)".to_string() 
-                    } else { 
-                        "Unknown".to_string() 
+                    pci_id: if name.contains("Apple")
+                        || name.contains("M1")
+                        || name.contains("M2")
+                        || name.contains("M3")
+                        || name.contains("M4")
+                    {
+                        "Apple Fabric (Integrated)".to_string()
+                    } else {
+                        "Unknown".to_string()
                     },
-                    vendor: if name.contains("Apple") || name.contains("M1") || name.contains("M2") || 
-                            name.contains("M3") || name.contains("M4") { 
-                        "Apple".to_string() 
-                    } else { 
-                        "Unknown".to_string() 
+                    vendor: if name.contains("Apple")
+                        || name.contains("M1")
+                        || name.contains("M2")
+                        || name.contains("M3")
+                        || name.contains("M4")
+                    {
+                        "Apple".to_string()
+                    } else {
+                        "Unknown".to_string()
                     },
                     numa_node: None,
                 });
@@ -2252,15 +2428,34 @@ impl ServerInfo {
                 // Parse GPU properties
                 if trimmed.starts_with("Chipset Model:") {
                     // Update the name to be more descriptive if we have chipset model
-                    gpu.name = trimmed.split(":").nth(1).unwrap_or("Unknown").trim().to_string();
+                    gpu.name = trimmed
+                        .split(":")
+                        .nth(1)
+                        .unwrap_or("Unknown")
+                        .trim()
+                        .to_string();
                 } else if trimmed.starts_with("VRAM (Total):") || trimmed.starts_with("VRAM:") {
-                    gpu.memory = trimmed.split(":").nth(1).unwrap_or("Unknown").trim().to_string();
+                    gpu.memory = trimmed
+                        .split(":")
+                        .nth(1)
+                        .unwrap_or("Unknown")
+                        .trim()
+                        .to_string();
                 } else if trimmed.starts_with("Vendor:") {
                     let vendor_str = trimmed.split(":").nth(1).unwrap_or("Unknown").trim();
                     // Extract vendor name from format like "Apple (0x106b)"
-                    gpu.vendor = vendor_str.split_whitespace().next().unwrap_or(vendor_str).to_string();
+                    gpu.vendor = vendor_str
+                        .split_whitespace()
+                        .next()
+                        .unwrap_or(vendor_str)
+                        .to_string();
                 } else if trimmed.starts_with("Device ID:") {
-                    gpu.pci_id = trimmed.split(":").nth(1).unwrap_or("Unknown").trim().to_string();
+                    gpu.pci_id = trimmed
+                        .split(":")
+                        .nth(1)
+                        .unwrap_or("Unknown")
+                        .trim()
+                        .to_string();
                 } else if trimmed.starts_with("Total Number of Cores:") {
                     // For Apple Silicon GPUs, they don't report VRAM separately
                     let cores = trimmed.split(":").nth(1).unwrap_or("0").trim();
@@ -2361,15 +2556,15 @@ impl ServerInfo {
     /// Collects network information on macOS using system_profiler and ifconfig
     fn collect_network_info_macos() -> Result<NetworkInfo, Box<dyn Error>> {
         let mut interfaces = Vec::new();
-        
+
         // Get ifconfig output for actual runtime interface information
         let ifconfig_output = Command::new("ifconfig").output();
         let mut ifconfig_data = std::collections::HashMap::new();
-        
+
         if let Ok(output) = ifconfig_output {
             let output_str = String::from_utf8(output.stdout).unwrap_or_default();
             let mut current_if = String::new();
-            
+
             for line in output_str.lines() {
                 if !line.starts_with('\t') && !line.starts_with(' ') && line.contains(':') {
                     // New interface
@@ -2379,14 +2574,23 @@ impl ServerInfo {
                     let trimmed = line.trim();
                     if trimmed.starts_with("ether ") {
                         if let Some(mac) = trimmed.split_whitespace().nth(1) {
-                            ifconfig_data.get_mut(&current_if).unwrap().insert("mac".to_string(), mac.to_string());
+                            ifconfig_data
+                                .get_mut(&current_if)
+                                .unwrap()
+                                .insert("mac".to_string(), mac.to_string());
                         }
                     } else if trimmed.starts_with("inet ") {
                         if let Some(ip) = trimmed.split_whitespace().nth(1) {
-                            ifconfig_data.get_mut(&current_if).unwrap().insert("ip".to_string(), ip.to_string());
+                            ifconfig_data
+                                .get_mut(&current_if)
+                                .unwrap()
+                                .insert("ip".to_string(), ip.to_string());
                         }
                     } else if trimmed.contains("status: active") {
-                        ifconfig_data.get_mut(&current_if).unwrap().insert("status".to_string(), "active".to_string());
+                        ifconfig_data
+                            .get_mut(&current_if)
+                            .unwrap()
+                            .insert("status".to_string(), "active".to_string());
                     }
                 }
             }
@@ -2402,10 +2606,18 @@ impl ServerInfo {
                 // Fallback: create interfaces from ifconfig data only
                 for (name, data) in ifconfig_data {
                     let interface_type = Self::classify_macos_interface_type(&name);
-                    let vendor = if name.starts_with("en") || name.starts_with("bridge") { "Apple" } else { "Unknown" };
+                    let vendor = if name.starts_with("en") || name.starts_with("bridge") {
+                        "Apple"
+                    } else {
+                        "Unknown"
+                    };
                     let model = Self::get_macos_interface_model(&interface_type);
-                    let pci_id = if vendor == "Apple" { "Apple Fabric (Integrated)" } else { "Unknown" };
-                    
+                    let pci_id = if vendor == "Apple" {
+                        "Apple Fabric (Integrated)"
+                    } else {
+                        "Unknown"
+                    };
+
                     interfaces.push(NetworkInterface {
                         name: name.clone(),
                         mac: data.get("mac").cloned().unwrap_or("Unknown".to_string()),
@@ -2418,7 +2630,7 @@ impl ServerInfo {
                         numa_node: None,
                     });
                 }
-                
+
                 return Ok(NetworkInfo {
                     interfaces,
                     infiniband: None,
@@ -2431,31 +2643,48 @@ impl ServerInfo {
 
         for line in output_str.lines() {
             let trimmed = line.trim();
-            
-            if trimmed.ends_with(":") && !line.starts_with("      ") && !line.starts_with("        ") {
+
+            if trimmed.ends_with(":")
+                && !line.starts_with("      ")
+                && !line.starts_with("        ")
+            {
                 // Save previous interface
                 if let Some(interface) = current_interface.take() {
                     interfaces.push(interface);
                 }
-                
+
                 let name = trimmed.trim_end_matches(':');
-                
+
                 // Skip the main "Network" section header
                 if name == "Network" {
                     continue;
                 }
                 let interface_type = Self::classify_macos_interface_type(name);
-                let vendor = if name.starts_with("en") || name.starts_with("bridge") { "Apple" } else { "Unknown" };
+                let vendor = if name.starts_with("en") || name.starts_with("bridge") {
+                    "Apple"
+                } else {
+                    "Unknown"
+                };
                 let model = Self::get_macos_interface_model(&interface_type);
-                let pci_id = if vendor == "Apple" { "Apple Fabric (Integrated)" } else { "Unknown" };
-                
+                let pci_id = if vendor == "Apple" {
+                    "Apple Fabric (Integrated)"
+                } else {
+                    "Unknown"
+                };
+
                 // Get runtime data from ifconfig
                 let ifconfig_info = ifconfig_data.get(name).cloned().unwrap_or_default();
-                
+
                 current_interface = Some(NetworkInterface {
                     name: name.to_string(),
-                    mac: ifconfig_info.get("mac").cloned().unwrap_or("Unknown".to_string()),
-                    ip: ifconfig_info.get("ip").cloned().unwrap_or("Unknown".to_string()),
+                    mac: ifconfig_info
+                        .get("mac")
+                        .cloned()
+                        .unwrap_or("Unknown".to_string()),
+                    ip: ifconfig_info
+                        .get("ip")
+                        .cloned()
+                        .unwrap_or("Unknown".to_string()),
                     speed: Self::estimate_macos_interface_speed(name, &interface_type),
                     type_: interface_type,
                     vendor: vendor.to_string(),
@@ -2465,22 +2694,33 @@ impl ServerInfo {
                 });
             } else if let Some(ref mut interface) = current_interface {
                 if trimmed.starts_with("Type:") {
-                    let sys_type = trimmed.split(":").nth(1).unwrap_or("Unknown").trim().to_string();
+                    let sys_type = trimmed
+                        .split(":")
+                        .nth(1)
+                        .unwrap_or("Unknown")
+                        .trim()
+                        .to_string();
                     if sys_type != "Unknown" {
                         interface.type_ = sys_type;
                     }
                 } else if trimmed.starts_with("Hardware:") {
-                    let hardware = trimmed.split(":").nth(1).unwrap_or("Unknown").trim().to_string();
+                    let hardware = trimmed
+                        .split(":")
+                        .nth(1)
+                        .unwrap_or("Unknown")
+                        .trim()
+                        .to_string();
                     if hardware != "Unknown" {
                         interface.model = hardware.clone();
                     }
-                    
+
                     // Set vendor based on interface types - Apple is the manufacturer for built-in interfaces
                     if interface.type_.contains("AirPort") || hardware.contains("AirPort") {
                         interface.vendor = "Apple".to_string();
                         interface.model = "Wi-Fi 802.11 a/b/g/n/ac/ax".to_string();
                         interface.pci_id = "Apple Fabric (Integrated)".to_string();
-                    } else if interface.type_.contains("Ethernet") || hardware.contains("Ethernet") {
+                    } else if interface.type_.contains("Ethernet") || hardware.contains("Ethernet")
+                    {
                         interface.vendor = "Apple".to_string();
                         interface.model = "Ethernet".to_string();
                         interface.pci_id = "Apple Fabric (Integrated)".to_string();
@@ -2502,9 +2742,19 @@ impl ServerInfo {
                         interface.name = bsd_name.to_string();
                     }
                 } else if trimmed.starts_with("MAC Address:") {
-                    interface.mac = trimmed.split(":").nth(1).unwrap_or("Unknown").trim().to_string();
+                    interface.mac = trimmed
+                        .split(":")
+                        .nth(1)
+                        .unwrap_or("Unknown")
+                        .trim()
+                        .to_string();
                 } else if trimmed.starts_with("IPv4 Addresses:") {
-                    interface.ip = trimmed.split(":").nth(1).unwrap_or("Unknown").trim().to_string();
+                    interface.ip = trimmed
+                        .split(":")
+                        .nth(1)
+                        .unwrap_or("Unknown")
+                        .trim()
+                        .to_string();
                 }
             }
         }
@@ -2531,10 +2781,13 @@ impl ServerInfo {
         }
 
         // Get Wi-Fi speeds from AirPort data
-        if let Ok(airport_output) = Command::new("system_profiler").args(&["SPAirPortDataType"]).output() {
+        if let Ok(airport_output) = Command::new("system_profiler")
+            .args(&["SPAirPortDataType"])
+            .output()
+        {
             let airport_str = String::from_utf8_lossy(&airport_output.stdout);
             let mut current_interface = "";
-            
+
             for line in airport_str.lines() {
                 let trimmed = line.trim();
                 if trimmed.ends_with(":") && !trimmed.starts_with(" ") {
@@ -2544,19 +2797,23 @@ impl ServerInfo {
                         let rate_mbps = format!("{} Mbps", rate.trim());
                         // Find the interface and update its speed
                         for interface in &mut interfaces {
-                            if interface.name == current_interface || 
-                               (current_interface == "en0" && interface.type_ == "AirPort") {
+                            if interface.name == current_interface
+                                || (current_interface == "en0" && interface.type_ == "AirPort")
+                            {
                                 interface.speed = Some(rate_mbps.clone());
                                 break;
                             }
                         }
                     }
-                } else if trimmed.starts_with("Supported PHY Modes:") && !current_interface.is_empty() {
+                } else if trimmed.starts_with("Supported PHY Modes:")
+                    && !current_interface.is_empty()
+                {
                     if let Some(modes) = trimmed.split(":").nth(1) {
                         // Update the interface model with PHY modes
                         for interface in &mut interfaces {
-                            if interface.name == current_interface || 
-                               (current_interface == "en0" && interface.type_ == "AirPort") {
+                            if interface.name == current_interface
+                                || (current_interface == "en0" && interface.type_ == "AirPort")
+                            {
                                 interface.model = format!("Wi-Fi {}", modes.trim());
                                 break;
                             }
@@ -2582,7 +2839,7 @@ impl ServerInfo {
             infiniband: None, // Infiniband not typically available on macOS
         })
     }
-    
+
     /// Classify macOS interface type based on name
     fn classify_macos_interface_type(name: &str) -> String {
         if name.starts_with("en") && name != "en0" {
@@ -2599,7 +2856,7 @@ impl ServerInfo {
             "Unknown".to_string()
         }
     }
-    
+
     /// Get macOS interface model based on type
     fn get_macos_interface_model(interface_type: &str) -> String {
         match interface_type {
@@ -2609,7 +2866,7 @@ impl ServerInfo {
             _ => "Unknown".to_string(),
         }
     }
-    
+
     /// Estimate macOS interface speed based on type and name
     fn estimate_macos_interface_speed(name: &str, interface_type: &str) -> Option<String> {
         match interface_type {
@@ -2773,24 +3030,24 @@ impl ServerInfo {
     }
 }
 
-// Legacy compatibility will be handled by keeping the old ServerInfo struct 
+// Legacy compatibility will be handled by keeping the old ServerInfo struct
 // and implementing From traits for conversion between old and new types
 
 // Convenience factory function for creating a hardware reporting service
 /// Create a hardware reporting service with platform-appropriate adapters
-/// 
+///
 /// This function sets up the complete dependency injection container with
 /// platform-specific implementations for the current operating system.
-/// 
+///
 /// # Returns
 /// * `Ok(Arc<dyn HardwareReportingService>)` - Configured service ready to use
 /// * `Err(Box<dyn Error>)` - Error occurred during service creation
-/// 
+///
 /// # Example
-/// 
+///
 /// ```rust,no_run
 /// use hardware_report::{create_service, ReportConfig};
-/// 
+///
 /// #[tokio::main]
 /// async fn main() -> Result<(), Box<dyn std::error::Error>> {
 ///     let service = create_service(None).await?;
@@ -2800,22 +3057,22 @@ impl ServerInfo {
 /// }
 /// ```
 /// Create a hardware reporting service with platform-appropriate adapters
-/// 
+///
 /// This function sets up the complete dependency injection container with
 /// platform-specific implementations for the current operating system.
-/// 
+///
 /// # Arguments
 /// * `config` - Optional report configuration (uses defaults if None)
-/// 
+///
 /// # Returns
 /// * `Ok(Arc<dyn HardwareReportingService>)` - Configured service ready to use
 /// * `Err(Box<dyn Error>)` - Error occurred during service creation
-/// 
+///
 /// # Example
-/// 
+///
 /// ```rust,no_run
 /// use hardware_report::{create_service, ReportConfig};
-/// 
+///
 /// #[tokio::main]
 /// async fn main() -> Result<(), Box<dyn std::error::Error>> {
 ///     let service = create_service(None).await?;
@@ -2824,38 +3081,40 @@ impl ServerInfo {
 ///     Ok(())
 /// }
 /// ```
-pub async fn create_service(config: Option<ReportConfig>) -> Result<std::sync::Arc<dyn HardwareReportingService>, Box<dyn Error>> {
+pub async fn create_service(
+    config: Option<ReportConfig>,
+) -> Result<std::sync::Arc<dyn HardwareReportingService>, Box<dyn Error>> {
     let container = ServiceContainer::default();
     container.create_hardware_reporting_service(config)
 }
 
 /// Create a hardware reporting service with custom container configuration
-/// 
+///
 /// # Arguments
 /// * `container_config` - Container configuration for customizing behavior
 /// * `report_config` - Optional report configuration
-/// 
+///
 /// # Returns
 /// * Configured hardware reporting service
 pub async fn create_service_with_config(
     container_config: ContainerConfig,
-    report_config: Option<ReportConfig>
+    report_config: Option<ReportConfig>,
 ) -> Result<std::sync::Arc<dyn HardwareReportingService>, Box<dyn Error>> {
     let container = ServiceContainer::new(container_config);
     container.create_hardware_reporting_service(report_config)
 }
 
 /// Validate system dependencies and privileges
-/// 
+///
 /// # Returns
 /// * `Ok((missing_deps, has_privileges))` - Missing dependencies and privilege status
 /// * `Err(Box<dyn Error>)` - Error occurred during validation
-/// 
+///
 /// # Example
-/// 
+///
 /// ```rust,no_run
 /// use hardware_report::validate_system;
-/// 
+///
 /// #[tokio::main]
 /// async fn main() -> Result<(), Box<dyn std::error::Error>> {
 ///     let (missing, has_privs) = validate_system().await?;

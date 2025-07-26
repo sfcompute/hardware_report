@@ -16,11 +16,11 @@ limitations under the License.
 
 pub mod entities;
 pub mod errors;
-pub mod services;
-pub mod parsers;
 pub mod legacy_compat;
+pub mod parsers;
+pub mod services;
 
 pub use entities::*;
 pub use errors::*;
-pub use services::*;
 pub use parsers::*;
+pub use services::*;
