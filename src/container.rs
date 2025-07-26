@@ -111,7 +111,7 @@ impl ServiceContainer {
     }
 
     /// Create a service container with default configuration
-    pub fn default() -> Self {
+    pub fn with_defaults() -> Self {
         Self::new(ContainerConfig::default())
     }
 
@@ -189,7 +189,7 @@ impl ServiceContainer {
         let missing = system_provider
             .get_missing_dependencies()
             .await
-            .map_err(|e| format!("Failed to check dependencies: {}", e))?;
+            .map_err(|e| format!("Failed to check dependencies: {e}"))?;
         Ok(missing)
     }
 
@@ -199,7 +199,7 @@ impl ServiceContainer {
         let has_privileges = system_provider
             .has_required_privileges()
             .await
-            .map_err(|e| format!("Failed to check privileges: {}", e))?;
+            .map_err(|e| format!("Failed to check privileges: {e}"))?;
         Ok(has_privileges)
     }
 }
@@ -265,7 +265,7 @@ mod tests {
 
     #[test]
     fn test_container_creation() {
-        let container = ServiceContainer::default();
+        let container = ServiceContainer::with_defaults();
         assert_eq!(
             container.get_platform_name(),
             if cfg!(target_os = "macos") {
@@ -291,7 +291,7 @@ mod tests {
 
     #[test]
     fn test_command_executor_creation() {
-        let container = ServiceContainer::default();
+        let container = ServiceContainer::with_defaults();
         let executor = container.create_command_executor();
 
         // Verify we got an executor (basic smoke test)
@@ -300,7 +300,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_system_info_provider_creation() {
-        let container = ServiceContainer::default();
+        let container = ServiceContainer::with_defaults();
         let result = container.create_system_info_provider();
 
         // Should succeed on supported platforms
@@ -311,14 +311,14 @@ mod tests {
 
     #[test]
     fn test_data_publisher_creation() {
-        let container = ServiceContainer::default();
+        let container = ServiceContainer::with_defaults();
         let result = container.create_data_publisher();
         assert!(result.is_ok());
     }
 
     #[test]
     fn test_complete_service_creation() {
-        let container = ServiceContainer::default();
+        let container = ServiceContainer::with_defaults();
         let result = container.create_hardware_reporting_service(None);
 
         // Should succeed on supported platforms

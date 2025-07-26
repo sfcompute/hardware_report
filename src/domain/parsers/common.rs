@@ -228,10 +228,10 @@ mod tests {
 
     #[test]
     fn test_parse_boolean() {
-        assert_eq!(parse_boolean("yes").unwrap(), true);
-        assert_eq!(parse_boolean("false").unwrap(), false);
-        assert_eq!(parse_boolean("1").unwrap(), true);
-        assert_eq!(parse_boolean("disabled").unwrap(), false);
+        assert!(parse_boolean("yes").unwrap());
+        assert!(!parse_boolean("false").unwrap());
+        assert!(parse_boolean("1").unwrap());
+        assert!(!parse_boolean("disabled").unwrap());
         assert!(parse_boolean("maybe").is_err());
     }
 

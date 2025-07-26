@@ -155,7 +155,6 @@ pub fn parse_macos_cpu_info(system_profiler_output: &str) -> Result<CpuInfo, Str
                 .split(':')
                 .nth(1)
                 .unwrap_or("1")
-                .trim()
                 .split_whitespace()
                 .next()
                 .unwrap_or("1");

@@ -69,7 +69,7 @@ struct Opt {
 
     /// Output file format (toml or json)
     #[structopt(long, default_value = "toml")]
-    file_format: FileFormat,
+    _file_format: FileFormat,
 
     /// Save POST payload to specified file for debugging (only works with --post)
     #[structopt(long)]
@@ -262,7 +262,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
             println!("\nDisplays:");
             // Run system_profiler to get display info
             if let Ok(output) = std::process::Command::new("system_profiler")
-                .args(&["SPDisplaysDataType", "-detailLevel", "mini"])
+                .args(["SPDisplaysDataType", "-detailLevel", "mini"])
                 .output()
             {
                 let output_str = String::from_utf8_lossy(&output.stdout);

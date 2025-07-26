@@ -78,7 +78,7 @@ impl SystemInfoProvider for LinuxSystemInfoProvider {
             })?;
 
         let lscpu_info =
-            parse_lscpu_output(&lscpu_output.stdout).map_err(|e| SystemError::ParseError(e))?;
+            parse_lscpu_output(&lscpu_output.stdout).map_err(SystemError::ParseError)?;
 
         // Try to get additional info from dmidecode (may require sudo)
         let dmidecode_cmd = SystemCommand::new("dmidecode")
@@ -117,7 +117,7 @@ impl SystemInfoProvider for LinuxSystemInfoProvider {
             })?;
 
         let total_memory =
-            parse_free_output(&free_output.stdout).map_err(|e| SystemError::ParseError(e))?;
+            parse_free_output(&free_output.stdout).map_err(SystemError::ParseError)?;
 
         // Try to get detailed memory info from dmidecode
         let dmidecode_cmd = SystemCommand::new("dmidecode")
@@ -165,7 +165,7 @@ impl SystemInfoProvider for LinuxSystemInfoProvider {
             })?;
 
         let devices =
-            parse_lsblk_output(&lsblk_output.stdout).map_err(|e| SystemError::ParseError(e))?;
+            parse_lsblk_output(&lsblk_output.stdout).map_err(SystemError::ParseError)?;
 
         Ok(StorageInfo { devices })
     }
@@ -245,7 +245,7 @@ impl SystemInfoProvider for LinuxSystemInfoProvider {
         })?;
 
         let interfaces =
-            parse_ip_output(&ip_output.stdout).map_err(|e| SystemError::ParseError(e))?;
+            parse_ip_output(&ip_output.stdout).map_err(SystemError::ParseError)?;
 
         Ok(NetworkInfo {
             interfaces,
@@ -267,7 +267,7 @@ impl SystemInfoProvider for LinuxSystemInfoProvider {
                 stderr: e.to_string(),
             })?;
 
-        parse_dmidecode_bios_info(&dmidecode_output.stdout).map_err(|e| SystemError::ParseError(e))
+        parse_dmidecode_bios_info(&dmidecode_output.stdout).map_err(SystemError::ParseError)
     }
 
     async fn get_chassis_info(&self) -> Result<ChassisInfo, SystemError> {
@@ -285,7 +285,7 @@ impl SystemInfoProvider for LinuxSystemInfoProvider {
             })?;
 
         parse_dmidecode_chassis_info(&dmidecode_output.stdout)
-            .map_err(|e| SystemError::ParseError(e))
+            .map_err(SystemError::ParseError)
     }
 
     async fn get_motherboard_info(&self) -> Result<MotherboardInfo, SystemError> {
@@ -330,7 +330,7 @@ impl SystemInfoProvider for LinuxSystemInfoProvider {
             })?;
 
         parse_dmidecode_system_info(&dmidecode_output.stdout)
-            .map_err(|e| SystemError::ParseError(e))
+            .map_err(SystemError::ParseError)
     }
 
     async fn get_numa_topology(&self) -> Result<HashMap<String, NumaNode>, SystemError> {

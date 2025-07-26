@@ -230,13 +230,13 @@ mod tests {
 
     #[tokio::test]
     async fn test_http_publisher_creation() {
-        let publisher = HttpDataPublisher::default();
+        let publisher = HttpDataPublisher::with_defaults();
         assert!(publisher.is_ok());
     }
 
     #[tokio::test]
     async fn test_create_payload_with_labels() {
-        let publisher = HttpDataPublisher::default().unwrap();
+        let publisher = HttpDataPublisher::with_defaults().unwrap();
         let report = create_test_report();
 
         let mut labels = HashMap::new();
@@ -258,7 +258,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_empty_endpoint_error() {
-        let publisher = HttpDataPublisher::default().unwrap();
+        let publisher = HttpDataPublisher::with_defaults().unwrap();
         let report = create_test_report();
         let config = PublishConfig {
             endpoint: String::new(),

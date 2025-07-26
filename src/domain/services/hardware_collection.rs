@@ -25,6 +25,21 @@ use async_trait::async_trait;
 use std::collections::HashMap;
 use std::sync::Arc;
 
+/// Parameters for creating a system summary
+struct SystemSummaryParams<'a> {
+    system_info: crate::domain::SystemInfo,
+    memory: &'a crate::domain::MemoryInfo,
+    storage: &'a crate::domain::StorageInfo,
+    gpus: &'a crate::domain::GpuInfo,
+    network: &'a crate::domain::NetworkInfo,
+    bios: crate::domain::BiosInfo,
+    chassis: crate::domain::ChassisInfo,
+    motherboard: crate::domain::MotherboardInfo,
+    numa_topology: HashMap<String, crate::domain::NumaNode>,
+    filesystems: Vec<String>,
+    cpu: &'a crate::domain::CpuInfo,
+}
+
 /// Domain service that implements hardware report collection
 ///
 /// This service coordinates the collection of hardware information from various
@@ -70,17 +85,17 @@ impl HardwareCollectionService {
         );
 
         let cpu = cpu_result
-            .map_err(|e| ReportError::GenerationFailed(format!("CPU collection failed: {}", e)))?;
+            .map_err(|e| ReportError::GenerationFailed(format!("CPU collection failed: {e}")))?;
         let memory = memory_result.map_err(|e| {
-            ReportError::GenerationFailed(format!("Memory collection failed: {}", e))
+            ReportError::GenerationFailed(format!("Memory collection failed: {e}"))
         })?;
         let storage = storage_result.map_err(|e| {
-            ReportError::GenerationFailed(format!("Storage collection failed: {}", e))
+            ReportError::GenerationFailed(format!("Storage collection failed: {e}"))
         })?;
         let gpus = gpu_result
-            .map_err(|e| ReportError::GenerationFailed(format!("GPU collection failed: {}", e)))?;
+            .map_err(|e| ReportError::GenerationFailed(format!("GPU collection failed: {e}")))?;
         let network = network_result.map_err(|e| {
-            ReportError::GenerationFailed(format!("Network collection failed: {}", e))
+            ReportError::GenerationFailed(format!("Network collection failed: {e}"))
         })?;
 
         let hardware = HardwareInfo {
@@ -108,101 +123,88 @@ impl HardwareCollectionService {
         );
 
         let system_info = system_info_result.map_err(|e| {
-            ReportError::GenerationFailed(format!("System info collection failed: {}", e))
+            ReportError::GenerationFailed(format!("System info collection failed: {e}"))
         })?;
         let bios = bios_result
-            .map_err(|e| ReportError::GenerationFailed(format!("BIOS collection failed: {}", e)))?;
+            .map_err(|e| ReportError::GenerationFailed(format!("BIOS collection failed: {e}")))?;
         let chassis = chassis_result.map_err(|e| {
-            ReportError::GenerationFailed(format!("Chassis collection failed: {}", e))
+            ReportError::GenerationFailed(format!("Chassis collection failed: {e}"))
         })?;
         let motherboard = motherboard_result.map_err(|e| {
-            ReportError::GenerationFailed(format!("Motherboard collection failed: {}", e))
+            ReportError::GenerationFailed(format!("Motherboard collection failed: {e}"))
         })?;
         let numa_topology = numa_result
-            .map_err(|e| ReportError::GenerationFailed(format!("NUMA collection failed: {}", e)))?;
+            .map_err(|e| ReportError::GenerationFailed(format!("NUMA collection failed: {e}")))?;
         let filesystems = filesystems_result.map_err(|e| {
-            ReportError::GenerationFailed(format!("Filesystem collection failed: {}", e))
+            ReportError::GenerationFailed(format!("Filesystem collection failed: {e}"))
         })?;
 
         // Calculate summary information
         let summary = self
-            .create_system_summary(
+            .create_system_summary(SystemSummaryParams {
                 system_info,
-                &memory,
-                &storage,
-                &gpus,
-                &network,
+                memory: &memory,
+                storage: &storage,
+                gpus: &gpus,
+                network: &network,
                 bios,
                 chassis,
                 motherboard,
                 numa_topology,
                 filesystems,
-                &cpu,
-            )
+                cpu: &cpu,
+            })
             .await?;
 
         Ok((hardware, summary))
     }
 
     /// Create system summary from collected information
-    async fn create_system_summary(
-        &self,
-        system_info: crate::domain::SystemInfo,
-        memory: &crate::domain::MemoryInfo,
-        storage: &crate::domain::StorageInfo,
-        gpus: &crate::domain::GpuInfo,
-        network: &crate::domain::NetworkInfo,
-        bios: crate::domain::BiosInfo,
-        chassis: crate::domain::ChassisInfo,
-        motherboard: crate::domain::MotherboardInfo,
-        numa_topology: HashMap<String, crate::domain::NumaNode>,
-        filesystems: Vec<String>,
-        cpu: &crate::domain::CpuInfo,
-    ) -> Result<SystemSummary, ReportError> {
+    async fn create_system_summary(&self, params: SystemSummaryParams<'_>) -> Result<SystemSummary, ReportError> {
         // Calculate CPU topology
         let cpu_topology = CpuTopology {
-            total_cores: cpu.cores * cpu.sockets,
-            total_threads: cpu.cores * cpu.sockets * cpu.threads,
-            sockets: cpu.sockets,
-            cores_per_socket: cpu.cores,
-            threads_per_core: cpu.threads,
-            numa_nodes: numa_topology.len() as u32,
-            cpu_model: cpu.model.clone(),
+            total_cores: params.cpu.cores * params.cpu.sockets,
+            total_threads: params.cpu.cores * params.cpu.sockets * params.cpu.threads,
+            sockets: params.cpu.sockets,
+            cores_per_socket: params.cpu.cores,
+            threads_per_core: params.cpu.threads,
+            numa_nodes: params.numa_topology.len() as u32,
+            cpu_model: params.cpu.model.clone(),
         };
 
         // Calculate total storage in TB
-        let total_storage_tb = self.calculate_total_storage_tb(&storage.devices);
+        let total_storage_tb = self.calculate_total_storage_tb(&params.storage.devices);
 
         // Create CPU summary string
         let cpu_summary = format!(
             "{} ({} Socket{}, {} Core{}/Socket, {} Thread{}/Core, {} NUMA Node{})",
-            cpu.model,
-            cpu.sockets,
-            if cpu.sockets == 1 { "" } else { "s" },
-            cpu.cores,
-            if cpu.cores == 1 { "" } else { "s" },
-            cpu.threads,
-            if cpu.threads == 1 { "" } else { "s" },
-            numa_topology.len(),
-            if numa_topology.len() == 1 { "" } else { "s" }
+            params.cpu.model,
+            params.cpu.sockets,
+            if params.cpu.sockets == 1 { "" } else { "s" },
+            params.cpu.cores,
+            if params.cpu.cores == 1 { "" } else { "s" },
+            params.cpu.threads,
+            if params.cpu.threads == 1 { "" } else { "s" },
+            params.numa_topology.len(),
+            if params.numa_topology.len() == 1 { "" } else { "s" }
         );
 
         // Create memory config string
-        let memory_config = format!("{} @ {}", memory.type_, memory.speed);
+        let memory_config = format!("{} @ {}", params.memory.type_, params.memory.speed);
 
         Ok(SystemSummary {
-            system_info,
-            total_memory: memory.total.clone(),
+            system_info: params.system_info,
+            total_memory: params.memory.total.clone(),
             memory_config,
-            total_storage: self.format_total_storage(&storage.devices),
+            total_storage: self.format_total_storage(&params.storage.devices),
             total_storage_tb,
-            filesystems,
-            bios,
-            chassis,
-            motherboard,
-            total_gpus: gpus.devices.len(),
-            total_nics: network.interfaces.len(),
-            numa_topology,
+            filesystems: params.filesystems,
+            bios: params.bios,
+            chassis: params.chassis,
+            motherboard: params.motherboard,
+            total_gpus: params.gpus.devices.len(),
+            total_nics: params.network.interfaces.len(),
+            numa_topology: params.numa_topology,
             cpu_topology,
             cpu_summary,
         })
@@ -257,12 +259,12 @@ impl HardwareCollectionService {
         &self,
     ) -> Result<(String, String, Vec<InterfaceIPs>), ReportError> {
         let hostname = self.system_provider.get_hostname().await.map_err(|e| {
-            ReportError::GenerationFailed(format!("Hostname collection failed: {}", e))
+            ReportError::GenerationFailed(format!("Hostname collection failed: {e}"))
         })?;
 
         let fqdn =
             self.system_provider.get_fqdn().await.map_err(|e| {
-                ReportError::GenerationFailed(format!("FQDN collection failed: {}", e))
+                ReportError::GenerationFailed(format!("FQDN collection failed: {e}"))
             })?;
 
         // For now, create empty OS IP list - this would be populated by network adapter
@@ -284,7 +286,7 @@ impl HardwareReportingService for HardwareCollectionService {
 
         // Get network info for the report
         let network = self.system_provider.get_network_info().await.map_err(|e| {
-            ReportError::GenerationFailed(format!("Network collection failed: {}", e))
+            ReportError::GenerationFailed(format!("Network collection failed: {e}"))
         })?;
 
         let report = HardwareReport {
@@ -314,7 +316,7 @@ impl HardwareReportingService for HardwareCollectionService {
             .get_missing_dependencies()
             .await
             .map_err(|e| {
-                ReportError::GenerationFailed(format!("Dependency validation failed: {}", e))
+                ReportError::GenerationFailed(format!("Dependency validation failed: {e}"))
             })
     }
 
@@ -322,6 +324,6 @@ impl HardwareReportingService for HardwareCollectionService {
         self.system_provider
             .has_required_privileges()
             .await
-            .map_err(|e| ReportError::GenerationFailed(format!("Privilege check failed: {}", e)))
+            .map_err(|e| ReportError::GenerationFailed(format!("Privilege check failed: {e}")))
     }
 }

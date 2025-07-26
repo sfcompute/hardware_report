@@ -3084,7 +3084,7 @@ impl ServerInfo {
 pub async fn create_service(
     config: Option<ReportConfig>,
 ) -> Result<std::sync::Arc<dyn HardwareReportingService>, Box<dyn Error>> {
-    let container = ServiceContainer::default();
+    let container = ServiceContainer::with_defaults();
     container.create_hardware_reporting_service(config)
 }
 
@@ -3131,7 +3131,7 @@ pub async fn create_service_with_config(
 /// }
 /// ```
 pub async fn validate_system() -> Result<(Vec<String>, bool), Box<dyn Error>> {
-    let container = ServiceContainer::default();
+    let container = ServiceContainer::with_defaults();
     let missing_deps = container.validate_dependencies().await?;
     let has_privileges = container.check_privileges().await?;
     Ok((missing_deps, has_privileges))

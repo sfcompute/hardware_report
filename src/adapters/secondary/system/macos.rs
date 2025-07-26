@@ -127,43 +127,42 @@ impl SystemInfoProvider for MacOSSystemInfoProvider {
         // Parse macOS GPU/display info
         for line in output.stdout.lines() {
             let trimmed = line.trim();
-            if trimmed.contains("M1")
+            if (trimmed.contains("M1")
                 || trimmed.contains("M2")
                 || trimmed.contains("M3")
-                || trimmed.contains("M4")
+                || trimmed.contains("M4"))
+                && (trimmed.contains("Max") || trimmed.contains("Pro") || trimmed.contains("Ultra"))
             {
-                if trimmed.contains("Max") || trimmed.contains("Pro") || trimmed.contains("Ultra") {
-                    let memory_cores = if trimmed.contains("M4 Max") {
-                        "40 cores"
-                    } else if trimmed.contains("M4 Pro") {
-                        "20 cores"
-                    } else if trimmed.contains("M3 Max") {
-                        "40 cores"
-                    } else if trimmed.contains("M3 Pro") {
-                        "18 cores"
-                    } else if trimmed.contains("M2 Max") {
-                        "38 cores"
-                    } else if trimmed.contains("M2 Pro") {
-                        "19 cores"
-                    } else if trimmed.contains("M1 Max") {
-                        "32 cores"
-                    } else if trimmed.contains("M1 Pro") {
-                        "16 cores"
-                    } else {
-                        "Unknown"
-                    };
+                let memory_cores = if trimmed.contains("M4 Max") {
+                    "40 cores"
+                } else if trimmed.contains("M4 Pro") {
+                    "20 cores"
+                } else if trimmed.contains("M3 Max") {
+                    "40 cores"
+                } else if trimmed.contains("M3 Pro") {
+                    "18 cores"
+                } else if trimmed.contains("M2 Max") {
+                    "38 cores"
+                } else if trimmed.contains("M2 Pro") {
+                    "19 cores"
+                } else if trimmed.contains("M1 Max") {
+                    "32 cores"
+                } else if trimmed.contains("M1 Pro") {
+                    "16 cores"
+                } else {
+                    "Unknown"
+                };
 
-                    devices.push(crate::domain::GpuDevice {
-                        index: gpu_index,
-                        name: format!("Apple {trimmed} (Metal 3)"),
-                        uuid: format!("macOS-GPU-{gpu_index}"),
-                        memory: format!("Unified Memory ({memory_cores} GPU cores)"),
-                        pci_id: "Apple Fabric (Integrated)".to_string(),
-                        vendor: "Apple".to_string(),
-                        numa_node: None,
-                    });
-                    gpu_index += 1;
-                }
+                devices.push(crate::domain::GpuDevice {
+                    index: gpu_index,
+                    name: format!("Apple {trimmed} (Metal 3)"),
+                    uuid: format!("macOS-GPU-{gpu_index}"),
+                    memory: format!("Unified Memory ({memory_cores} GPU cores)"),
+                    pci_id: "Apple Fabric (Integrated)".to_string(),
+                    vendor: "Apple".to_string(),
+                    numa_node: None,
+                });
+                gpu_index += 1;
             }
         }
 

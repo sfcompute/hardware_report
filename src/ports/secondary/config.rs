@@ -68,18 +68,13 @@ pub trait ConfigurationProvider: Send + Sync {
 }
 
 /// Output format options
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Default)]
 pub enum OutputFormat {
     /// JSON format
     Json,
     /// TOML format
     Toml,
     /// Both JSON and TOML
+    #[default]
     Both,
-}
-
-impl Default for OutputFormat {
-    fn default() -> Self {
-        OutputFormat::Both
-    }
 }

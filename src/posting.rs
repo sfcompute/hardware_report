@@ -49,13 +49,14 @@ pub async fn post_data(
     let mut request = client.post(endpoint).json(&payload);
 
     if let Some(token) = auth_token {
-        request = request.header("Authorization", format!("Bearer {}", token));
+        request = request.header("Authorization", format!("Bearer {token}"));
     }
 
     let response = request.send().await?;
 
     if !response.status().is_success() {
-        return Err(format!("HTTP request failed: {}", response.status()).into());
+        let status = response.status();
+        return Err(format!("HTTP request failed: {status}").into());
     }
     Ok(())
 }

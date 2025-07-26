@@ -222,7 +222,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_unix_command_executor_basic() {
-        let executor = UnixCommandExecutor::default();
+        let executor = UnixCommandExecutor::with_defaults();
 
         let cmd = SystemCommand::new("echo").args(&["hello", "world"]);
 
@@ -233,7 +233,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_command_availability_check() {
-        let executor = UnixCommandExecutor::default();
+        let executor = UnixCommandExecutor::with_defaults();
 
         // Test with a command that should not exist
         assert!(!executor
@@ -252,7 +252,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_command_timeout() {
-        let executor = UnixCommandExecutor::default();
+        let executor = UnixCommandExecutor::with_defaults();
 
         let cmd = SystemCommand::new("sleep")
             .args(&["10"])
@@ -265,7 +265,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_get_command_path() {
-        let executor = UnixCommandExecutor::default();
+        let executor = UnixCommandExecutor::with_defaults();
 
         // Test that the function works without panicking
         let path = executor.get_command_path("echo").await.unwrap();
@@ -284,7 +284,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_has_elevated_privileges() {
-        let executor = UnixCommandExecutor::default();
+        let executor = UnixCommandExecutor::with_defaults();
 
         // This will return false unless running as root
         let _is_root = executor.has_elevated_privileges().await.unwrap();

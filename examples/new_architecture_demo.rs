@@ -164,7 +164,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
         verbose: true,
     };
 
-    let custom_service =
+    let _custom_service =
         create_service_with_config(custom_container_config, Some(custom_report_config)).await?;
 
     println!("✅ Custom configured service created");
@@ -250,7 +250,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
     println!("✅ Both binary and library usage work seamlessly");
     println!("✅ Legacy compatibility maintained");
     println!("✅ New features and capabilities delivered");
-    println!("");
+    println!();
     println!("🚀 Ready for production use!");
 
     Ok(())
