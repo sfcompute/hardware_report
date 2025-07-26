@@ -16,9 +16,7 @@ limitations under the License.
 
 //! Memory information parsing functions
 
-use super::common::{
-    bytes_to_human_readable, clean_value, parse_size_to_bytes,
-};
+use super::common::{bytes_to_human_readable, clean_value, parse_size_to_bytes};
 use crate::domain::{MemoryInfo, MemoryModule};
 
 /// Parse memory information from Linux free command output

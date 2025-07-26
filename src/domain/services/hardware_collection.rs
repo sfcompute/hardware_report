@@ -15,8 +15,8 @@ limitations under the License.
 */
 
 use crate::domain::{
-    CpuTopology, HardwareInfo, HardwareReport, InterfaceIPs, PublishConfig,
-    PublishError, ReportConfig, ReportError, SystemSummary,
+    CpuTopology, HardwareInfo, HardwareReport, InterfaceIPs, PublishConfig, PublishError,
+    ReportConfig, ReportError, SystemSummary,
 };
 use crate::ports::{
     ConfigurationProvider, DataPublisher, HardwareReportingService, SystemInfoProvider,

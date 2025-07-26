@@ -17,8 +17,7 @@ limitations under the License.
 //! Dependency injection container for hardware reporting services
 
 use crate::adapters::{
-    HttpDataPublisher, LinuxSystemInfoProvider, MacOSSystemInfoProvider,
-    UnixCommandExecutor,
+    HttpDataPublisher, LinuxSystemInfoProvider, MacOSSystemInfoProvider, UnixCommandExecutor,
 };
 use crate::domain::{HardwareCollectionService, ReportConfig};
 use crate::ports::{
