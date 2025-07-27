@@ -65,12 +65,12 @@ pub fn parse_size_to_bytes(size_str: &str) -> Result<u64, String> {
             "M" => 1024 * 1024,
             "G" => 1024 * 1024 * 1024,
             "T" => 1024_u64.pow(4),
-            _ => return Err(format!("Unknown unit: {}", unit)),
+            _ => return Err(format!("Unknown unit: {unit}")),
         };
 
         Ok((number * multiplier as f64) as u64)
     } else {
-        Err(format!("Unable to parse size: {}", size_str))
+        Err(format!("Unable to parse size: {size_str}"))
     }
 }
 
@@ -94,7 +94,7 @@ pub fn extract_dmidecode_value(output: &str, key: &str) -> Result<String, String
             }
         }
     }
-    Err(format!("Key '{}' not found in dmidecode output", key))
+    Err(format!("Key '{key}' not found in dmidecode output"))
 }
 
 /// Parse a key-value pair from system output
@@ -112,10 +112,7 @@ pub fn parse_key_value(line: &str, separator: char) -> Result<(String, String), 
         let value = line[pos + 1..].trim().to_string();
         Ok((key, value))
     } else {
-        Err(format!(
-            "No separator '{}' found in line: {}",
-            separator, line
-        ))
+        Err(format!("No separator '{separator}' found in line: {line}"))
     }
 }
 
@@ -146,7 +143,7 @@ pub fn parse_boolean(value: &str) -> Result<bool, String> {
     match value.trim().to_lowercase().as_str() {
         "yes" | "true" | "1" | "on" | "enabled" | "active" => Ok(true),
         "no" | "false" | "0" | "off" | "disabled" | "inactive" => Ok(false),
-        _ => Err(format!("Cannot parse '{}' as boolean", value)),
+        _ => Err(format!("Cannot parse '{value}' as boolean")),
     }
 }
 

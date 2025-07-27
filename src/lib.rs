@@ -426,7 +426,7 @@ impl ServerInfo {
 
             if !status.status.success() {
                 missing_packages.push(*package);
-                missing_info.push(format!("  - {}: {}", package, purpose));
+                missing_info.push(format!("  - {package}: {purpose}"));
             }
         }
 
@@ -434,7 +434,7 @@ impl ServerInfo {
             eprintln!("\nWarning: Some system utilities are not installed.");
             eprintln!("Missing utilities:");
             for info in &missing_info {
-                eprintln!("{}", info);
+                eprintln!("{info}");
             }
             eprintln!("\nSome hardware information may be incomplete or unavailable.");
 
@@ -665,7 +665,7 @@ impl ServerInfo {
                 "M" | "MB" => 1024_u64 * 1024,
                 "G" | "GB" => 1024_u64 * 1024 * 1024,
                 "T" | "TB" => 1024_u64 * 1024 * 1024 * 1024,
-                _ => return Err(format!("Unknown storage unit: {}", unit).into()),
+                _ => return Err(format!("Unknown storage unit: {unit}").into()),
             };
 
             Ok((value * multiplier as f64) as u64)
@@ -674,7 +674,7 @@ impl ServerInfo {
             if size_str.contains("BYTES") || size_str.contains("B") {
                 Ok(0) // Return 0 for unparseable sizes instead of erroring
             } else {
-                Err(format!("Invalid storage size format: {}", size).into())
+                Err(format!("Invalid storage size format: {size}").into())
             }
         }
     }
@@ -850,14 +850,13 @@ impl ServerInfo {
             }
         }
 
-        let pci_id = format!("{}:{}", vendor_id, device_id);
+        let pci_id = format!("{vendor_id}:{device_id}");
         Ok((vendor, device, pci_id))
     }
 
     /// Gets NUMA node for a PCI device
     fn get_numa_node(pci_addr: &str) -> Option<i32> {
-        if let Ok(path) = std::fs::read_link(format!("/sys/bus/pci/devices/{}/numa_node", pci_addr))
-        {
+        if let Ok(path) = std::fs::read_link(format!("/sys/bus/pci/devices/{pci_addr}/numa_node")) {
             if let Ok(content) = std::fs::read_to_string(path) {
                 if let Ok(node) = content.trim().parse() {
                     return Some(node);
@@ -1062,7 +1061,7 @@ impl ServerInfo {
                     .trim()
                     .to_string();
                 if !chip_name.is_empty() && chip_name != "Unknown" {
-                    model = format!("{} ({})", model, chip_name);
+                    model = format!("{model} ({chip_name})");
                 }
             }
         }
@@ -1461,7 +1460,7 @@ impl ServerInfo {
             }
         }
 
-        Err(format!("Could not find key: {}", key).into())
+        Err(format!("Could not find key: {key}").into())
     }
 
     /// Gets detailed CPU topology information
@@ -1729,7 +1728,7 @@ impl ServerInfo {
             cores,
             threads,
             sockets,
-            speed: format!("{} MHz", speed),
+            speed: format!("{speed} MHz"),
         })
     }
 
@@ -1814,7 +1813,7 @@ impl ServerInfo {
                 let freq_str = String::from_utf8_lossy(&output.stdout);
                 if let Ok(freq_hz) = freq_str.trim().parse::<u64>() {
                     let freq_mhz = freq_hz / 1_000_000;
-                    return Ok(format!("{} MHz", freq_mhz));
+                    return Ok(format!("{freq_mhz} MHz"));
                 }
             }
         }
@@ -2091,7 +2090,7 @@ impl ServerInfo {
         let memsize_str = String::from_utf8(output.stdout)?;
         if let Ok(bytes) = memsize_str.trim().parse::<u64>() {
             let gb = bytes as f64 / (1024.0 * 1024.0 * 1024.0);
-            Ok(format!("{:.1}G", gb))
+            Ok(format!("{gb:.1}G"))
         } else {
             Ok("Unknown".to_string())
         }
@@ -2110,7 +2109,7 @@ impl ServerInfo {
                             if parts.len() >= 2 {
                                 let kb: u64 = parts[1].parse().unwrap_or(0);
                                 let gb = kb as f64 / 1024.0 / 1024.0;
-                                return Ok(format!("{:.1}G", gb));
+                                return Ok(format!("{gb:.1}G"));
                             }
                         }
                     }
@@ -2234,7 +2233,7 @@ impl ServerInfo {
                             name: device_name.clone(),
                             type_: medium_type.to_lowercase(),
                             size: capacity,
-                            model: format!("{} ({})", device_name, protocol),
+                            model: format!("{device_name} ({protocol})"),
                         });
                     }
                 } else {
@@ -2303,7 +2302,7 @@ impl ServerInfo {
                                             "hdd".to_string()
                                         },
                                         size: total_size,
-                                        model: format!("{} ({})", device_name, device_location),
+                                        model: format!("{device_name} ({device_location})"),
                                     });
                                 }
                             }
@@ -2400,7 +2399,7 @@ impl ServerInfo {
                 current_gpu = Some(GpuDevice {
                     index,
                     name: name.clone(),
-                    uuid: format!("macOS-GPU-{}", index),
+                    uuid: format!("macOS-GPU-{index}"),
                     memory: "Unknown".to_string(),
                     pci_id: if name.contains("Apple")
                         || name.contains("M1")
@@ -2459,12 +2458,12 @@ impl ServerInfo {
                 } else if trimmed.starts_with("Total Number of Cores:") {
                     // For Apple Silicon GPUs, they don't report VRAM separately
                     let cores = trimmed.split(":").nth(1).unwrap_or("0").trim();
-                    gpu.memory = format!("Unified Memory ({} cores)", cores);
+                    gpu.memory = format!("Unified Memory ({cores} cores)");
                 } else if trimmed.starts_with("Metal Support:") {
                     // Capture Metal support version
                     let metal_version = trimmed.split(":").nth(1).unwrap_or("").trim();
                     if !metal_version.is_empty() && gpu.name.contains("Apple") {
-                        gpu.name = format!("{} ({})", gpu.name, metal_version);
+                        gpu.name = format!("{} ({metal_version})", gpu.name);
                     }
                 }
             }
@@ -2488,7 +2487,7 @@ impl ServerInfo {
                         let chip_name = line.split(":").nth(1).unwrap_or("Unknown").trim();
                         devices.push(GpuDevice {
                             index: 0,
-                            name: format!("{} GPU", chip_name),
+                            name: format!("{chip_name} GPU"),
                             uuid: "macOS-integrated-GPU".to_string(),
                             memory: "Unified Memory".to_string(),
                             pci_id: "Integrated".to_string(),
@@ -2532,7 +2531,7 @@ impl ServerInfo {
                         index: parts[0].trim().parse()?,
                         name: parts[1].trim().to_string(),
                         uuid: parts[2].trim().to_string(),
-                        memory: format!("{}", parts[3].trim()),
+                        memory: parts[3].trim().to_string(),
                         pci_id,
                         vendor,
                         numa_node: Self::get_numa_node(pci_addr),
@@ -2919,7 +2918,7 @@ impl ServerInfo {
                     let mut numa_node = None;
 
                     if let Ok(pci_addr) =
-                        std::fs::read_link(format!("/sys/class/net/{}/device", name))
+                        std::fs::read_link(format!("/sys/class/net/{name}/device"))
                     {
                         if let Some(addr_str) = pci_addr.file_name().and_then(|n| n.to_str()) {
                             if let Ok((v, m, p)) = Self::get_pci_info(addr_str) {

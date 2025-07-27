@@ -32,8 +32,8 @@ pub async fn post_data(
     // Write payload to file if path is provided
     if let Some(path) = write_payload_to {
         match std::fs::write(path, serde_json::to_string_pretty(&payload)?) {
-            Ok(_) => println!("Successfully saved payload to {}", path),
-            Err(e) => eprintln!("Failed to write payload to {}: {}", path, e),
+            Ok(_) => println!("Successfully saved payload to {path}"),
+            Err(e) => eprintln!("Failed to write payload to {path}: {e}"),
         }
     }
 

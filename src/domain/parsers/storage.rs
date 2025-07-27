@@ -76,7 +76,7 @@ pub fn parse_macos_storage_info(
                 name: model.clone(),
                 type_: "ssd".to_string(),
                 size: "Unknown".to_string(),
-                model: format!("{} (Apple Fabric)", model),
+                model: format!("{model} (Apple Fabric)"),
             });
         } else if trimmed.starts_with("Size:") && current_device.is_some() {
             // Extract size information

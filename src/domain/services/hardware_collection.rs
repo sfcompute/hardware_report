@@ -233,10 +233,10 @@ impl HardwareCollectionService {
 
         let total_tb = self.calculate_total_storage_tb(devices);
         if total_tb >= 1.0 {
-            format!("{:.1} TB", total_tb)
+            format!("{total_tb:.1} TB")
         } else {
             let total_gb = total_tb * 1024.0;
-            format!("{:.0} GB", total_gb)
+            format!("{total_gb:.0} GB")
         }
     }
 

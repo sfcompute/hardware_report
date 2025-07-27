@@ -215,7 +215,7 @@ impl SystemInfoProvider for LinuxSystemInfoProvider {
                             devices.push(crate::domain::GpuDevice {
                                 index: gpu_index,
                                 name: line.to_string(),
-                                uuid: format!("pci-gpu-{}", gpu_index),
+                                uuid: format!("pci-gpu-{gpu_index}"),
                                 memory: "Unknown".to_string(),
                                 pci_id: "Unknown".to_string(),
                                 vendor: "Unknown".to_string(),
