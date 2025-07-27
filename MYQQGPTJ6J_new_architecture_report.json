@@ -1,0 +1,134 @@
+{
+  "summary": {
+    "system_info": {
+      "uuid": "53040FFD-5BCE-5B29-A887-2B7EEA02A0EE",
+      "serial": "MYQQGPTJ6J",
+      "product_name": "MacBook Pro (Apple M4 Max)",
+      "product_manufacturer": "Apple Inc."
+    },
+    "total_memory": "64 GB",
+    "memory_config": "LPDDR5 @ Integrated",
+    "total_storage": "0 GB",
+    "total_storage_tb": 0.0,
+    "filesystems": [
+      "/dev/disk3s1s1  1.9T  262G  1.6T  15% /",
+      "/dev/disk3s6    1.9T  262G  1.6T  15% /System/Volumes/VM",
+      "/dev/disk3s2    1.9T  262G  1.6T  15% /System/Volumes/Preboot",
+      "/dev/disk3s4    1.9T  262G  1.6T  15% /System/Volumes/Update",
+      "/dev/disk1s2    500M   19M  482M   4% /System/Volumes/xarts",
+      "/dev/disk1s1    500M   19M  482M   4% /System/Volumes/iSCPreboot",
+      "/dev/disk1s3    500M   19M  482M   4% /System/Volumes/Hardware",
+      "/dev/disk3s7    1.9T  262G  1.6T  15% /nix"
+    ],
+    "bios": {
+      "vendor": "Apple Inc.",
+      "version": "11881.121.1",
+      "release_date": "11881.121.1",
+      "firmware_version": "11881.121.1"
+    },
+    "chassis": {
+      "manufacturer": "Apple Inc.",
+      "type_": "Laptop",
+      "serial": "MYQQGPTJ6J"
+    },
+    "motherboard": {
+      "manufacturer": "Apple Inc.",
+      "product_name": "Mac16,5",
+      "version": "11881.121.1",
+      "serial": "MYQQGPTJ6J",
+      "features": "Integrated",
+      "location": "System Board",
+      "type_": "Motherboard"
+    },
+    "total_gpus": 2,
+    "total_nics": 1,
+    "numa_topology": {},
+    "cpu_topology": {
+      "total_cores": 1,
+      "total_threads": 1,
+      "sockets": 1,
+      "cores_per_socket": 1,
+      "threads_per_core": 1,
+      "numa_nodes": 0,
+      "cpu_model": "Apple M4 Max"
+    },
+    "cpu_summary": "Apple M4 Max (1 Socket, 1 Core/Socket, 1 Thread/Core, 0 NUMA Nodes)"
+  },
+  "hostname": "Kennys-MacBook-Pro.local",
+  "fqdn": "Kennys-MacBook-Pro.local",
+  "os_ip": [],
+  "bmc_ip": null,
+  "bmc_mac": null,
+  "hardware": {
+    "cpu": {
+      "model": "Apple M4 Max",
+      "cores": 1,
+      "threads": 1,
+      "sockets": 1,
+      "speed": "Unknown"
+    },
+    "memory": {
+      "total": "64 GB",
+      "type_": "LPDDR5",
+      "speed": "Integrated",
+      "modules": [
+        {
+          "size": "64 GB",
+          "type_": "LPDDR5",
+          "speed": "Integrated",
+          "location": "System Memory",
+          "manufacturer": "Micron",
+          "serial": "N/A"
+        }
+      ]
+    },
+    "storage": {
+      "devices": [
+        {
+          "name": "APPLE SSD",
+          "type_": "ssd",
+          "size": "Unknown",
+          "model": "Apple SSD"
+        }
+      ]
+    },
+    "gpus": {
+      "devices": [
+        {
+          "index": 0,
+          "name": "Apple Apple M4 Max: (Metal 3)",
+          "uuid": "macOS-GPU-0",
+          "memory": "Unified Memory",
+          "pci_id": "Unknown",
+          "vendor": "Apple",
+          "numa_node": null
+        },
+        {
+          "index": 1,
+          "name": "Apple Chipset Model: Apple M4 Max (Metal 3)",
+          "uuid": "macOS-GPU-1",
+          "memory": "Unified Memory",
+          "pci_id": "Unknown",
+          "vendor": "Apple",
+          "numa_node": null
+        }
+      ]
+    }
+  },
+  "network": {
+    "interfaces": [
+      {
+        "name": "en0",
+        "mac": "Unknown",
+        "ip": "Unknown",
+        "speed": "1000 Mbps",
+        "type_": "Wi-Fi",
+        "vendor": "Apple",
+        "model": "Wi-Fi",
+        "pci_id": "Unknown",
+        "numa_node": null
+      }
+    ],
+    "infiniband": null
+  }
+}

@@ -69,7 +69,7 @@ struct Opt {
 
     /// Output file format (toml or json)
     #[structopt(long, default_value = "toml")]
-    file_format: FileFormat,
+    _file_format: FileFormat,
 
     /// Save POST payload to specified file for debugging (only works with --post)
     #[structopt(long)]
@@ -128,36 +128,66 @@ async fn main() -> Result<(), Box<dyn Error>> {
             server_info.summary.total_storage, server_info.summary.total_storage_tb
         );
 
-        // Calculate total storage
-        let total_storage = server_info
+        // Calculate total storage - show clean disk sizes
+        let disk_sizes: Vec<String> = server_info
             .hardware
             .storage
             .devices
             .iter()
-            .map(|device| device.size.clone())
-            .collect::<Vec<String>>()
-            .join(" + ");
-        println!("Available Disks: {}", total_storage);
+            .map(|device| {
+                // Extract clean size from macOS format or use as-is for Linux
+                if device.size.contains("TB (") {
+                    // Extract "2.0 TB" from "2.0 TB (2001111162880 Bytes) (exactly...)"
+                    device
+                        .size
+                        .split(" (")
+                        .next()
+                        .unwrap_or(&device.size)
+                        .to_string()
+                } else {
+                    device.size.clone()
+                }
+            })
+            .collect();
+        if !disk_sizes.is_empty() {
+            println!("Available Disks: {}", disk_sizes.join(" + "));
+        }
 
-        // Get BIOS information from dmidecode
-        let output = Command::new("dmidecode").args(["-t", "bios"]).output()?;
-        let bios_str = String::from_utf8(output.stdout)?;
-        println!(
-            "BIOS: {} {} ({})",
-            ServerInfo::extract_dmidecode_value(&bios_str, "Vendor")?,
-            ServerInfo::extract_dmidecode_value(&bios_str, "Version")?,
-            ServerInfo::extract_dmidecode_value(&bios_str, "Release Date")?
-        );
+        // Get BIOS/Firmware information (platform-specific)
+        if cfg!(target_os = "macos") {
+            println!(
+                "BIOS: {} {} ({})",
+                server_info.summary.bios.vendor,
+                server_info.summary.bios.version,
+                server_info.summary.bios.release_date
+            );
+            println!(
+                "Chassis: {} {} (S/N: {})",
+                server_info.summary.chassis.manufacturer,
+                server_info.summary.chassis.type_,
+                server_info.summary.chassis.serial
+            );
+        } else {
+            // Linux - use dmidecode
+            let output = Command::new("dmidecode").args(["-t", "bios"]).output()?;
+            let bios_str = String::from_utf8(output.stdout)?;
+            println!(
+                "BIOS: {} {} ({})",
+                ServerInfo::extract_dmidecode_value(&bios_str, "Vendor")?,
+                ServerInfo::extract_dmidecode_value(&bios_str, "Version")?,
+                ServerInfo::extract_dmidecode_value(&bios_str, "Release Date")?
+            );
 
-        // Get chassis information from dmidecode
-        let output = Command::new("dmidecode").args(["-t", "chassis"]).output()?;
-        let chassis_str = String::from_utf8(output.stdout)?;
-        println!(
-            "Chassis: {} {} (S/N: {})",
-            ServerInfo::extract_dmidecode_value(&chassis_str, "Manufacturer")?,
-            ServerInfo::extract_dmidecode_value(&chassis_str, "Type")?,
-            ServerInfo::extract_dmidecode_value(&chassis_str, "Serial Number")?
-        );
+            // Get chassis information from dmidecode
+            let output = Command::new("dmidecode").args(["-t", "chassis"]).output()?;
+            let chassis_str = String::from_utf8(output.stdout)?;
+            println!(
+                "Chassis: {} {} (S/N: {})",
+                ServerInfo::extract_dmidecode_value(&chassis_str, "Manufacturer")?,
+                ServerInfo::extract_dmidecode_value(&chassis_str, "Type")?,
+                ServerInfo::extract_dmidecode_value(&chassis_str, "Serial Number")?
+            );
+        }
 
         // Get motherboard information from server_info
         println!(
@@ -170,51 +200,113 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
         println!("\nNetwork Interfaces:");
         for nic in &server_info.network.interfaces {
+            let numa_info = if cfg!(target_os = "macos") || nic.numa_node.is_none() {
+                String::new() // No NUMA info on macOS or when not detected
+            } else {
+                format!(
+                    " [NUMA: {}]",
+                    nic.numa_node
+                        .map_or("Unknown".to_string(), |n| n.to_string())
+                )
+            };
+
+            let pci_info = if cfg!(target_os = "macos") && nic.pci_id == "Unknown" {
+                String::new() // Hide PCI ID on macOS when not available
+            } else {
+                format!(" ({})", nic.pci_id)
+            };
+
             println!(
-                "  {} - {} {} ({}) [Speed: {}] [NUMA: {}]",
+                "  {} - {} {}{} [Speed: {}]{}",
                 nic.name,
                 nic.vendor,
                 nic.model,
-                nic.pci_id,
+                pci_info,
                 nic.speed.as_deref().unwrap_or("Unknown"),
-                nic.numa_node
-                    .map_or("Unknown".to_string(), |n| n.to_string())
+                numa_info
             );
         }
 
         println!("\nGPUs:");
         for gpu in &server_info.hardware.gpus.devices {
+            let numa_info = if cfg!(target_os = "macos") || gpu.numa_node.is_none() {
+                String::new() // No NUMA info on macOS or when not detected
+            } else {
+                format!(
+                    " [NUMA: {}]",
+                    gpu.numa_node
+                        .map_or("Unknown".to_string(), |n| n.to_string())
+                )
+            };
+
+            let pci_info = if cfg!(target_os = "macos") && gpu.pci_id == "Unknown" {
+                String::new() // Hide PCI ID on macOS when not available
+            } else {
+                format!(" ({})", gpu.pci_id)
+            };
+
+            let memory_info = if gpu.memory != "Unknown" {
+                format!(" [{}]", gpu.memory)
+            } else {
+                String::new()
+            };
+
             println!(
-                "  {} - {} ({}) [NUMA: {}]",
-                gpu.name,
-                gpu.vendor,
-                gpu.pci_id,
-                gpu.numa_node
-                    .map_or("Unknown".to_string(), |n| n.to_string())
+                "  {} - {}{}{}{}",
+                gpu.name, gpu.vendor, memory_info, pci_info, numa_info
             );
         }
 
-        println!("\nNUMA Topology:");
-        for (node_id, node) in &server_info.summary.numa_topology {
-            println!("  Node {}:", node_id);
-            println!("    Memory: {}", node.memory);
-            println!("    CPUs: {:?}", node.cpus);
-
-            if !node.devices.is_empty() {
-                println!("    Devices:");
-                for device in &node.devices {
-                    println!(
-                        "      {} - {} (PCI ID: {})",
-                        device.type_, device.name, device.pci_id
-                    );
+        // On macOS, show display information summary
+        if cfg!(target_os = "macos") {
+            println!("\nDisplays:");
+            // Run system_profiler to get display info
+            if let Ok(output) = std::process::Command::new("system_profiler")
+                .args(["SPDisplaysDataType", "-detailLevel", "mini"])
+                .output()
+            {
+                let output_str = String::from_utf8_lossy(&output.stdout);
+                let mut in_displays_section = false;
+                for line in output_str.lines() {
+                    let trimmed = line.trim();
+                    if trimmed.starts_with("Displays:") {
+                        in_displays_section = true;
+                        continue;
+                    }
+                    if in_displays_section && line.starts_with("        ") && trimmed.ends_with(":")
+                    {
+                        // This is a display name
+                        let display_name = trimmed.trim_end_matches(':');
+                        println!("  {display_name}");
+                    }
                 }
             }
+        }
 
-            println!("    Distances:");
-            let mut distances: Vec<_> = node.distances.iter().collect();
-            distances.sort_by_key(|&(k, _)| k);
-            for (to_node, distance) in distances {
-                println!("      To Node {}: {}", to_node, distance);
+        // Only show NUMA topology on Linux where it's relevant
+        if !cfg!(target_os = "macos") && !server_info.summary.numa_topology.is_empty() {
+            println!("\nNUMA Topology:");
+            for (node_id, node) in &server_info.summary.numa_topology {
+                println!("  Node {node_id}:");
+                println!("    Memory: {}", node.memory);
+                println!("    CPUs: {:?}", node.cpus);
+
+                if !node.devices.is_empty() {
+                    println!("    Devices:");
+                    for device in &node.devices {
+                        println!(
+                            "      {} - {} (PCI ID: {})",
+                            device.type_, device.name, device.pci_id
+                        );
+                    }
+                }
+
+                println!("    Distances:");
+                let mut distances: Vec<_> = node.distances.iter().collect();
+                distances.sort_by_key(|&(k, _)| k);
+                for (to_node, distance) in distances {
+                    println!("      To Node {to_node}: {distance}");
+                }
             }
         }
 
@@ -252,28 +344,21 @@ async fn main() -> Result<(), Box<dyn Error>> {
             .collect::<String>()
     }
 
-    println!(
-        "\nCreating {} output for system serial number: {}",
-        opt.file_format, safe_filename
-    );
+    println!("\nCreating output files for system serial number: {safe_filename}");
 
-    let output_filename = format!(
-        "{}_hardware_report.{}",
-        safe_filename,
-        match opt.file_format {
-            FileFormat::Toml => "toml",
-            FileFormat::Json => "json",
-        }
-    );
+    // Generate both TOML and JSON files
+    let toml_filename = format!("{safe_filename}_hardware_report.toml");
+    let json_filename = format!("{safe_filename}_hardware_report.json");
 
-    // Convert to specified format and write to file
-    let output_string = match opt.file_format {
-        FileFormat::Toml => toml::to_string_pretty(&server_info)?,
-        FileFormat::Json => serde_json::to_string_pretty(&server_info)?,
-    };
+    // Write TOML file
+    let toml_string = toml::to_string_pretty(&server_info)?;
+    std::fs::write(&toml_filename, toml_string)?;
 
-    std::fs::write(&output_filename, output_string)?;
-    println!("Configuration has been written to {}", output_filename);
+    // Write JSON file
+    let json_string = serde_json::to_string_pretty(&server_info)?;
+    std::fs::write(&json_filename, json_string)?;
+
+    println!("Configuration files have been written:");
 
     // Handle posting if enabled
     if opt.post {
@@ -289,6 +374,11 @@ async fn main() -> Result<(), Box<dyn Error>> {
         .await?;
         println!("\nSuccessfully posted data to remote server");
     }
+
+    // Final message about available output formats
+    println!("\nHardware report files are available in both JSON and TOML formats:");
+    println!("  - {toml_filename}");
+    println!("  - {json_filename}");
 
     Ok(())
 }

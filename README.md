@@ -523,19 +523,28 @@ pci_id = "15b3:1021"
 ## Architecture & Dependencies
 
 ### System Requirements
-- **Operating System**: Linux (primary target)
-- **Privileges**: Root access required for hardware introspection
-- **Architecture**: x86_64 (primary), with cross-compilation support
+- **Operating System**: Linux (primary target), macOS (compatibility mode)
+- **Privileges**: Root access recommended for complete hardware introspection
+- **Architecture**: x86_64 (primary), ARM64 (Apple Silicon), with cross-compilation support
 
 ### Runtime Dependencies
-**Nix-built binaries include all dependencies automatically:**
+
+**Linux (Nix-built binaries include all dependencies automatically):**
 - `numactl` - NUMA topology information
 - `ipmitool` - BMC information extraction
 - `ethtool` - Network interface details
 - `lscpu` - CPU configuration data
 - `lspci` - PCI device enumeration
+- `dmidecode` - System/BIOS/memory information
 
-**Note**: NVIDIA drivers must be installed separately for GPU detection.
+**macOS (Built-in tools, no additional dependencies required):**
+- `system_profiler` - Hardware configuration data
+- `sysctl` - System configuration information
+- `ioreg` - Hardware registry information
+
+**Note**: 
+- NVIDIA drivers must be installed separately for GPU detection on Linux
+- Some Linux-specific features (NUMA topology, IPMI/BMC) are not available on macOS
 
 ### Core Libraries
 - **regex** - System command output parsing

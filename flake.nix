@@ -31,18 +31,22 @@
         buildInputs = with pkgs; [
           openssl
         ] ++ lib.optionals stdenv.isDarwin [
-          darwin.apple_sdk.frameworks.Security
-          darwin.apple_sdk.frameworks.SystemConfiguration
+          darwin.apple_sdk_11_0.frameworks.Security
+          darwin.apple_sdk_11_0.frameworks.SystemConfiguration
         ];
         
         # Runtime dependencies that the binary needs
-        runtimeDeps = with pkgs; [
+        runtimeDeps = with pkgs; lib.optionals stdenv.isLinux [
           numactl
           ipmitool
           ethtool
           util-linux  # for lscpu
           pciutils    # for lspci
           dmidecode   # for system/BIOS/memory information
+        ] ++ lib.optionals stdenv.isDarwin [
+          # macOS equivalents where available
+          # system_profiler is built-in on macOS
+          # sysctl is built-in on macOS
         ];
         
         hardware_report_unwrapped = pkgs.rustPlatform.buildRustPackage {
@@ -255,8 +259,14 @@ EOF
             echo "Run 'cargo build' to build the project"
             echo "Run 'cargo run' to run the project"
             echo ""
-            echo "Runtime dependencies are available in PATH:"
-            echo "- numactl, ipmitool, ethtool, lscpu, lspci, dmidecode"
+            echo "Platform: ${if pkgs.stdenv.isDarwin then "macOS" else "Linux"}"
+            echo "Runtime dependencies available:"
+            ${if pkgs.stdenv.isDarwin then ''
+            echo "- Built-in macOS tools: system_profiler, sysctl, ioreg"
+            echo "- Note: Some Linux-specific features may not be available"
+            '' else ''
+            echo "- Linux tools: numactl, ipmitool, ethtool, lscpu, lspci, dmidecode"
+            ''}
           '';
         };
         

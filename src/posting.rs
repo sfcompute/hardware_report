@@ -32,8 +32,8 @@ pub async fn post_data(
     // Write payload to file if path is provided
     if let Some(path) = write_payload_to {
         match std::fs::write(path, serde_json::to_string_pretty(&payload)?) {
-            Ok(_) => println!("Successfully saved payload to {}", path),
-            Err(e) => eprintln!("Failed to write payload to {}: {}", path, e),
+            Ok(_) => println!("Successfully saved payload to {path}"),
+            Err(e) => eprintln!("Failed to write payload to {path}: {e}"),
         }
     }
 
@@ -49,13 +49,14 @@ pub async fn post_data(
     let mut request = client.post(endpoint).json(&payload);
 
     if let Some(token) = auth_token {
-        request = request.header("Authorization", format!("Bearer {}", token));
+        request = request.header("Authorization", format!("Bearer {token}"));
     }
 
     let response = request.send().await?;
 
     if !response.status().is_success() {
-        return Err(format!("HTTP request failed: {}", response.status()).into());
+        let status = response.status();
+        return Err(format!("HTTP request failed: {status}").into());
     }
     Ok(())
 }

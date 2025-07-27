@@ -1,0 +1,180 @@
+{
+  "summary": {
+    "system_info": {
+      "uuid": "53040FFD-5BCE-5B29-A887-2B7EEA02A0EE",
+      "serial": "MYQQGPTJ6J",
+      "product_name": "MacBook Pro (Apple M4 Max)",
+      "product_manufacturer": "Apple Inc."
+    },
+    "total_memory": "64.0G",
+    "memory_config": "LPDDR5 @ Integrated",
+    "total_storage": "2.0 TB",
+    "total_storage_tb": 1.81464035063982,
+    "filesystems": [
+      "/dev/disk3s1s1 (apfs) - 1.9T total, 262G used, 1.6T available, mounted on /",
+      "/dev/disk3s6 (apfs) - 1.9T total, 262G used, 1.6T available, mounted on /System/Volumes/VM",
+      "/dev/disk3s2 (apfs) - 1.9T total, 262G used, 1.6T available, mounted on /System/Volumes/Preboot",
+      "/dev/disk3s4 (apfs) - 1.9T total, 262G used, 1.6T available, mounted on /System/Volumes/Update",
+      "/dev/disk1s2 (apfs) - 500M total, 19M used, 482M available, mounted on /System/Volumes/xarts",
+      "/dev/disk1s1 (apfs) - 500M total, 19M used, 482M available, mounted on /System/Volumes/iSCPreboot",
+      "/dev/disk1s3 (apfs) - 500M total, 19M used, 482M available, mounted on /System/Volumes/Hardware",
+      "/dev/disk3s7 (apfs) - 1.9T total, 262G used, 1.6T available, mounted on /nix"
+    ],
+    "bios": {
+      "vendor": "Apple Inc.",
+      "version": "11881.121.1",
+      "release_date": "N/A",
+      "firmware_version": "11881.121.1"
+    },
+    "chassis": {
+      "manufacturer": "Apple Inc.",
+      "type_": "Laptop",
+      "serial": "MYQQGPTJ6J"
+    },
+    "motherboard": {
+      "manufacturer": "Apple Inc.",
+      "product_name": "Mac16,5",
+      "version": "11881.121.1",
+      "serial": "MYQQGPTJ6J",
+      "features": "Integrated",
+      "location": "System Board",
+      "type_": "Motherboard"
+    },
+    "total_gpus": 1,
+    "total_nics": 6,
+    "numa_topology": {},
+    "cpu_topology": {
+      "total_cores": 16,
+      "total_threads": 16,
+      "sockets": 1,
+      "cores_per_socket": 16,
+      "threads_per_core": 1,
+      "numa_nodes": 1,
+      "cpu_model": "Apple M4 Max"
+    },
+    "cpu_summary": "Apple M4 Max (1 Socket, 16 Cores/Socket, 1 Thread/Core, 1 NUMA Node)"
+  },
+  "hostname": "Kennys-MacBook-Pro.local",
+  "fqdn": "Kennys-MacBook-Pro.local",
+  "os_ip": [],
+  "bmc_ip": null,
+  "bmc_mac": null,
+  "hardware": {
+    "cpu": {
+      "model": "Apple M4 Max",
+      "cores": 16,
+      "threads": 1,
+      "sockets": 1,
+      "speed": "Unknown"
+    },
+    "memory": {
+      "total": "64.0G",
+      "type_": "LPDDR5",
+      "speed": "Integrated",
+      "modules": [
+        {
+          "size": "64.0G",
+          "type_": "LPDDR5",
+          "speed": "Integrated",
+          "location": "System Memory",
+          "manufacturer": "Micron",
+          "serial": "N/A"
+        }
+      ]
+    },
+    "storage": {
+      "devices": [
+        {
+          "name": "APPLE SSD AP2048Z",
+          "type_": "ssd",
+          "size": "2 TB (1,995,218,165,760 bytes)",
+          "model": "APPLE SSD AP2048Z (Apple Fabric)"
+        }
+      ]
+    },
+    "gpus": {
+      "devices": [
+        {
+          "index": 0,
+          "name": "Apple M4 Max (Metal 3)",
+          "uuid": "macOS-GPU-0",
+          "memory": "Unified Memory (40 cores)",
+          "pci_id": "Apple Fabric (Integrated)",
+          "vendor": "Apple",
+          "numa_node": null
+        }
+      ]
+    }
+  },
+  "network": {
+    "interfaces": [
+      {
+        "name": "en4",
+        "mac": "56",
+        "ip": "Unknown",
+        "speed": "1000 Mbps",
+        "type_": "Ethernet",
+        "vendor": "Apple",
+        "model": "Ethernet",
+        "pci_id": "Apple Fabric (Integrated)",
+        "numa_node": null
+      },
+      {
+        "name": "en5",
+        "mac": "56",
+        "ip": "Unknown",
+        "speed": "1000 Mbps",
+        "type_": "Ethernet",
+        "vendor": "Apple",
+        "model": "Ethernet",
+        "pci_id": "Apple Fabric (Integrated)",
+        "numa_node": null
+      },
+      {
+        "name": "en6",
+        "mac": "56",
+        "ip": "Unknown",
+        "speed": "1000 Mbps",
+        "type_": "Ethernet",
+        "vendor": "Apple",
+        "model": "Ethernet",
+        "pci_id": "Apple Fabric (Integrated)",
+        "numa_node": null
+      },
+      {
+        "name": "bridge0",
+        "mac": "Unknown",
+        "ip": "Unknown",
+        "speed": "1000 Mbps",
+        "type_": "Ethernet",
+        "vendor": "Apple",
+        "model": "Ethernet",
+        "pci_id": "Apple Fabric (Integrated)",
+        "numa_node": null
+      },
+      {
+        "name": "en0",
+        "mac": "84",
+        "ip": "192.168.1.90",
+        "speed": "1200 Mbps",
+        "type_": "AirPort",
+        "vendor": "Apple",
+        "model": "Wi-Fi 802.11 a/b/g/n/ac/ax",
+        "pci_id": "Apple Fabric (Integrated)",
+        "numa_node": null
+      },
+      {
+        "name": "utun4",
+        "mac": "Unknown",
+        "ip": "100.84.190.125",
+        "speed": null,
+        "type_": "VPN (io.tailscale.ipn.macos)",
+        "vendor": "Unknown",
+        "model": "Unknown",
+        "pci_id": "Unknown",
+        "numa_node": null
+      }
+    ],
+    "infiniband": null
+  }
+}
