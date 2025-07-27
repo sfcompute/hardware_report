@@ -277,7 +277,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
                     {
                         // This is a display name
                         let display_name = trimmed.trim_end_matches(':');
-                        println!("  {}", display_name);
+                        println!("  {display_name}");
                     }
                 }
             }
@@ -287,7 +287,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
         if !cfg!(target_os = "macos") && !server_info.summary.numa_topology.is_empty() {
             println!("\nNUMA Topology:");
             for (node_id, node) in &server_info.summary.numa_topology {
-                println!("  Node {}:", node_id);
+                println!("  Node {node_id}:");
                 println!("    Memory: {}", node.memory);
                 println!("    CPUs: {:?}", node.cpus);
 
@@ -344,14 +344,11 @@ async fn main() -> Result<(), Box<dyn Error>> {
             .collect::<String>()
     }
 
-    println!(
-        "\nCreating output files for system serial number: {}",
-        safe_filename
-    );
+    println!("\nCreating output files for system serial number: {safe_filename}");
 
     // Generate both TOML and JSON files
-    let toml_filename = format!("{}_hardware_report.toml", safe_filename);
-    let json_filename = format!("{}_hardware_report.json", safe_filename);
+    let toml_filename = format!("{safe_filename}_hardware_report.toml");
+    let json_filename = format!("{safe_filename}_hardware_report.json");
 
     // Write TOML file
     let toml_string = toml::to_string_pretty(&server_info)?;
@@ -380,8 +377,8 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
     // Final message about available output formats
     println!("\nHardware report files are available in both JSON and TOML formats:");
-    println!("  - {}", toml_filename);
-    println!("  - {}", json_filename);
+    println!("  - {toml_filename}");
+    println!("  - {json_filename}");
 
     Ok(())
 }
