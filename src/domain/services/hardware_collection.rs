@@ -86,9 +86,8 @@ impl HardwareCollectionService {
 
         let cpu = cpu_result
             .map_err(|e| ReportError::GenerationFailed(format!("CPU collection failed: {e}")))?;
-        let memory = memory_result.map_err(|e| {
-            ReportError::GenerationFailed(format!("Memory collection failed: {e}"))
-        })?;
+        let memory = memory_result
+            .map_err(|e| ReportError::GenerationFailed(format!("Memory collection failed: {e}")))?;
         let storage = storage_result.map_err(|e| {
             ReportError::GenerationFailed(format!("Storage collection failed: {e}"))
         })?;
@@ -160,7 +159,10 @@ impl HardwareCollectionService {
     }
 
     /// Create system summary from collected information
-    async fn create_system_summary(&self, params: SystemSummaryParams<'_>) -> Result<SystemSummary, ReportError> {
+    async fn create_system_summary(
+        &self,
+        params: SystemSummaryParams<'_>,
+    ) -> Result<SystemSummary, ReportError> {
         // Calculate CPU topology
         let cpu_topology = CpuTopology {
             total_cores: params.cpu.cores * params.cpu.sockets,
@@ -186,7 +188,11 @@ impl HardwareCollectionService {
             params.cpu.threads,
             if params.cpu.threads == 1 { "" } else { "s" },
             params.numa_topology.len(),
-            if params.numa_topology.len() == 1 { "" } else { "s" }
+            if params.numa_topology.len() == 1 {
+                ""
+            } else {
+                "s"
+            }
         );
 
         // Create memory config string

@@ -164,8 +164,7 @@ impl SystemInfoProvider for LinuxSystemInfoProvider {
                 stderr: e.to_string(),
             })?;
 
-        let devices =
-            parse_lsblk_output(&lsblk_output.stdout).map_err(SystemError::ParseError)?;
+        let devices = parse_lsblk_output(&lsblk_output.stdout).map_err(SystemError::ParseError)?;
 
         Ok(StorageInfo { devices })
     }
@@ -244,8 +243,7 @@ impl SystemInfoProvider for LinuxSystemInfoProvider {
             }
         })?;
 
-        let interfaces =
-            parse_ip_output(&ip_output.stdout).map_err(SystemError::ParseError)?;
+        let interfaces = parse_ip_output(&ip_output.stdout).map_err(SystemError::ParseError)?;
 
         Ok(NetworkInfo {
             interfaces,
@@ -284,8 +282,7 @@ impl SystemInfoProvider for LinuxSystemInfoProvider {
                 stderr: e.to_string(),
             })?;
 
-        parse_dmidecode_chassis_info(&dmidecode_output.stdout)
-            .map_err(SystemError::ParseError)
+        parse_dmidecode_chassis_info(&dmidecode_output.stdout).map_err(SystemError::ParseError)
     }
 
     async fn get_motherboard_info(&self) -> Result<MotherboardInfo, SystemError> {
@@ -329,8 +326,7 @@ impl SystemInfoProvider for LinuxSystemInfoProvider {
                 stderr: e.to_string(),
             })?;
 
-        parse_dmidecode_system_info(&dmidecode_output.stdout)
-            .map_err(SystemError::ParseError)
+        parse_dmidecode_system_info(&dmidecode_output.stdout).map_err(SystemError::ParseError)
     }
 
     async fn get_numa_topology(&self) -> Result<HashMap<String, NumaNode>, SystemError> {
