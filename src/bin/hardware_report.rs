@@ -305,7 +305,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
                 let mut distances: Vec<_> = node.distances.iter().collect();
                 distances.sort_by_key(|&(k, _)| k);
                 for (to_node, distance) in distances {
-                    println!("      To Node {}: {}", to_node, distance);
+                    println!("      To Node {to_node}: {distance}");
                 }
             }
         }
