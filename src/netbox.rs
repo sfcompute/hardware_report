@@ -56,7 +56,7 @@ pub struct NetBoxDevice {
     pub airflow: Option<String>, // "front-to-rear", "rear-to-front", etc.
     pub primary_ip4: Option<u32>, // ID of primary IPv4
     pub primary_ip6: Option<u32>, // ID of primary IPv6
-    pub oob_ip: Option<u32>, // Out-of-band IP address ID (reference to IP address object)
+    // Note: NetBox doesn't have a native oob_ip field - BMC IP is handled via interfaces
     pub cluster: Option<u32>, // ID of cluster
     pub virtual_chassis: Option<u32>,
     pub vc_position: Option<u32>,
@@ -661,7 +661,7 @@ pub async fn sync_to_netbox(
         airflow: Some("front-to-rear".to_string()),
         primary_ip4: None, // Will be set after creating IPs
         primary_ip6: None,
-        oob_ip: None, // Will be set to BMC IP ID if available
+        // NetBox doesn't have oob_ip field - BMC handled via interfaces
         cluster: None,
         virtual_chassis: None,
         vc_position: None,
@@ -961,9 +961,9 @@ pub async fn sync_to_netbox(
                 
                 // Set as primary IP with proper priority:
                 // 1. Tailscale IPs have highest priority for primary IP
-                // 2. Then primary interfaces (eth0, eno1, etc.)
+                // 2. Then primary interfaces (eth0, eno1, etc.)  
                 // 3. Skip management interfaces for primary IP
-                if !is_mgmt && (
+                let should_be_primary = !is_mgmt && (
                     (is_tailscale && primary_ip4_id.is_none()) ||
                     (primary_ip4_id.is_none() && (
                         nic.name.starts_with("eth0") || 
@@ -971,9 +971,17 @@ pub async fn sync_to_netbox(
                         nic.name.starts_with("enp") ||
                         interface_count == 1
                     ))
-                ) {
+                );
+                
+                if should_be_primary {
                     primary_ip4_id = Some(ip_id);
-                    println!("Set as primary IP: {} ({})", ip, if is_tailscale { "Tailscale" } else { "Standard" });
+                    println!("✓ Selected as PRIMARY IP: {} on interface {} (ID: {}) - {}", 
+                        ip, nic.name, ip_id,
+                        if is_tailscale { "Tailscale VPN" } else { "Standard Network" });
+                } else {
+                    println!("  Created IP: {} on interface {} (ID: {}) - {}", 
+                        ip, nic.name, ip_id,
+                        if is_mgmt { "Management" } else if is_tailscale { "Tailscale" } else { "Secondary" });
                 }
             }
         }
@@ -984,18 +992,31 @@ pub async fn sync_to_netbox(
     
     if let Some(primary_ip) = primary_ip4_id {
         update_payload["primary_ip4"] = serde_json::Value::Number(primary_ip.into());
-        println!("Setting primary IPv4 to ID: {}", primary_ip);
+        println!("📡 UPDATING DEVICE: Setting primary_ip4 field to IP address ID: {}", primary_ip);
+    } else {
+        println!("⚠️  WARNING: No primary IP was selected for device!");
     }
     
-    // Set BMC IP as out-of-band IP if we created one
-    if let Some(bmc_ip_ref) = bmc_ip_id {
-        update_payload["oob_ip"] = serde_json::Value::Number(bmc_ip_ref.into());
-        println!("Setting out-of-band IP to BMC IP ID: {}", bmc_ip_ref);
+    // Add BMC information to custom fields for visibility since NetBox doesn't have native BMC fields
+    if let (Some(bmc_ip), Some(bmc_mac)) = (&server_info.bmc_ip, &server_info.bmc_mac) {
+        if bmc_ip != "0.0.0.0" && bmc_mac != "00:00:00:00:00:00" {
+            let mut custom_fields = HashMap::new();
+            custom_fields.insert("bmc_ip_address".to_string(), serde_json::Value::String(bmc_ip.clone()));
+            custom_fields.insert("bmc_mac_address".to_string(), serde_json::Value::String(bmc_mac.clone()));
+            
+            update_payload["custom_fields"] = serde_json::Value::Object(
+                custom_fields.into_iter().collect()
+            );
+            println!("Added BMC IP ({}) and MAC ({}) to custom fields", bmc_ip, bmc_mac);
+        }
     }
     
     // Only update if we have changes to make
     if !update_payload.as_object().unwrap().is_empty() {
         let update_url = format!("{}/api/dcim/devices/{}/", client.base_url, device_id);
+        println!("🔄 Sending device update to: {}", update_url);
+        println!("📋 Update payload: {}", serde_json::to_string_pretty(&update_payload)?);
+        
         let response = client.client
             .patch(&update_url)
             .header("Authorization", format!("Token {}", client.token))
@@ -1003,11 +1024,16 @@ pub async fn sync_to_netbox(
             .send()
             .await?;
         
-        if response.status().is_success() {
-            println!("Successfully updated device with IP assignments");
+        let status = response.status();
+        if status.is_success() {
+            println!("✅ Successfully updated device with IP assignments");
         } else {
-            println!("Warning: Failed to update device IP assignments: {}", response.status());
+            let error_body = response.text().await.unwrap_or_else(|_| "Unknown error".to_string());
+            eprintln!("❌ Failed to update device IP assignments: Status: {}", status);
+            eprintln!("   Error details: {}", error_body);
         }
+    } else {
+        println!("ℹ️  No device updates needed (empty payload)");
     }
     
     // Create inventory items for components
