@@ -572,7 +572,7 @@ pub async fn sync_to_netbox(
     let role = device_role.unwrap_or("production");
     let device_role_id = client.get_or_create_device_role(role).await?;
     
-    // Create custom fields for additional hardware info
+    // Create custom fields for additional hardware info including BMC
     let mut custom_fields = HashMap::new();
     custom_fields.insert("bios_version".to_string(), serde_json::Value::String(server_info.summary.bios.version.clone()));
     custom_fields.insert("bios_vendor".to_string(), serde_json::Value::String(server_info.summary.bios.vendor.clone()));
@@ -582,6 +582,19 @@ pub async fn sync_to_netbox(
     custom_fields.insert("numa_nodes".to_string(), serde_json::Value::Number(server_info.summary.cpu_topology.numa_nodes.into()));
     custom_fields.insert("total_memory".to_string(), serde_json::Value::String(server_info.summary.total_memory.clone()));
     custom_fields.insert("total_storage".to_string(), serde_json::Value::String(server_info.summary.total_storage.clone()));
+    custom_fields.insert("rack_height".to_string(), serde_json::Value::String("4U".to_string()));
+    
+    // Add BMC information if available
+    if let Some(bmc_ip) = &server_info.bmc_ip {
+        if bmc_ip != "0.0.0.0" {
+            custom_fields.insert("bmc_ip".to_string(), serde_json::Value::String(bmc_ip.clone()));
+        }
+    }
+    if let Some(bmc_mac) = &server_info.bmc_mac {
+        if bmc_mac != "00:00:00:00:00:00" {
+            custom_fields.insert("bmc_mac".to_string(), serde_json::Value::String(bmc_mac.clone()));
+        }
+    }
     
     // Create or update device
     let device = NetBoxDevice {
@@ -620,9 +633,102 @@ pub async fn sync_to_netbox(
     let device_id = client.create_or_update_device(&device).await?;
     println!("Created/updated device {} (ID: {})", device.name, device_id);
     
-    // Create interfaces and IP addresses
+    // Create BMC interface first if BMC information is available
+    let mut bmc_interface_id = None;
+    if let (Some(bmc_ip), Some(bmc_mac)) = (&server_info.bmc_ip, &server_info.bmc_mac) {
+        if bmc_ip != "0.0.0.0" && bmc_mac != "00:00:00:00:00:00" {
+            let bmc_interface = NetBoxInterface {
+                device: device_id,
+                name: "BMC".to_string(),
+                type_: "1000base-t".to_string(), // Most BMCs are 1Gb
+                enabled: true,
+                parent: None,
+                bridge: None,
+                lag: None,
+                mtu: None,
+                mac_address: Some(bmc_mac.clone()),
+                speed: Some(1_000_000), // 1Gb in Kbps
+                duplex: Some("auto".to_string()),
+                wwn: None,
+                mgmt_only: true, // BMC is always management only
+                description: Some("Baseboard Management Controller (IPMI/BMC)".to_string()),
+                mode: None,
+                rf_role: None,
+                rf_channel: None,
+                poe_mode: None,
+                poe_type: None,
+                rf_channel_frequency: None,
+                rf_channel_width: None,
+                tx_power: None,
+                untagged_vlan: None,
+                tagged_vlans: None,
+                mark_connected: true, // BMC should be connected
+                cable: None,
+                cable_end: None,
+                wireless_link: None,
+                link_peers: None,
+                link_peers_type: None,
+                wireless_lans: None,
+                vrf: None,
+                tags: None,
+                custom_fields: {
+                    let mut cf = HashMap::new();
+                    cf.insert("interface_type".to_string(), serde_json::Value::String("BMC".to_string()));
+                    Some(cf)
+                },
+            };
+            
+            bmc_interface_id = Some(client.create_interface(&bmc_interface).await?);
+            println!("Created BMC interface (ID: {})", bmc_interface_id.unwrap());
+            
+            // Create BMC IP address
+            let subnet_mask = if bmc_ip.starts_with("10.") {
+                "/8"
+            } else if bmc_ip.starts_with("172.") {
+                "/12"
+            } else if bmc_ip.starts_with("192.168.") {
+                "/24"
+            } else {
+                "/24"
+            };
+            
+            let bmc_netbox_ip = NetBoxIPAddress {
+                address: format!("{}{}", bmc_ip, subnet_mask),
+                vrf: None,
+                tenant: None,
+                status: "active".to_string(),
+                role: Some("vip".to_string()), // BMC IPs are VIPs
+                assigned_object_type: Some("dcim.interface".to_string()),
+                assigned_object_id: bmc_interface_id,
+                nat_inside: None,
+                nat_outside: None,
+                dns_name: Some(format!("{}-bmc.example.com", server_info.hostname)),
+                description: Some("BMC/IPMI Management IP".to_string()),
+                comments: None,
+                tags: None,
+                custom_fields: None,
+            };
+            
+            let bmc_ip_id = client.create_ip_address(&bmc_netbox_ip).await?;
+            println!("Created BMC IP address {} (ID: {})", bmc_netbox_ip.address, bmc_ip_id);
+        }
+    }
+    
+    // Create interfaces and IP addresses from network interfaces
     let mut primary_ip4_id = None;
     let mut interface_count = 0;
+    
+    // Enhanced IP detection - collect all IPs from os_ip field for better coverage
+    let mut all_interface_ips: HashMap<String, Vec<String>> = HashMap::new();
+    for interface_ip in &server_info.os_ip {
+        let interface_name = &interface_ip.interface;
+        for ip_addr in &interface_ip.ip_addresses {
+            all_interface_ips
+                .entry(interface_name.clone())
+                .or_insert_with(Vec::new)
+                .push(ip_addr.clone());
+        }
+    }
     
     for nic in &server_info.network.interfaces {
         // Determine if this is a management interface (out-of-band)
@@ -709,21 +815,59 @@ pub async fn sync_to_netbox(
         println!("Created interface {} (ID: {})", interface.name, interface_id);
         interface_count += 1;
         
-        // Create IP addresses for this interface
-        let ips = vec![&nic.ip]; // NetworkInterface has a single ip field, not ips
-        for ip in &ips {
-            if *ip != "127.0.0.1" && !ip.starts_with("::") && !ip.starts_with("fe80:") && *ip != "Unknown" {
+        // Create IP addresses for this interface - use enhanced IP collection
+        let interface_ips = all_interface_ips.get(&nic.name)
+            .cloned()
+            .unwrap_or_else(|| vec![nic.ip.clone()]); // Fallback to single IP
+        
+        for ip in &interface_ips {
+            if ip != "127.0.0.1" && !ip.starts_with("::") && !ip.starts_with("fe80:") && ip != "Unknown" && !ip.is_empty() {
+                // Detect Tailscale interfaces
+                let is_tailscale = nic.name.contains("tailscale") || 
+                                 nic.name.contains("ts") ||
+                                 nic.name == "tailscale0" ||
+                                 // Check if IP is in Tailscale CGNAT range (100.64.0.0/10)
+                                 (ip.starts_with("100.") && {
+                                     if let Ok(ip_parts) = ip.split('.').take(2).collect::<Vec<_>>()[1].parse::<u8>() {
+                                         ip_parts >= 64 && ip_parts <= 127
+                                     } else {
+                                         false
+                                     }
+                                 });
+                
                 // Determine subnet mask based on IP class and common patterns
                 let subnet_mask = if ip.starts_with("10.") {
                     "/8"  // Private Class A
                 } else if ip.starts_with("172.") {
-                    "/12" // Private Class B
+                    "/12" // Private Class B  
                 } else if ip.starts_with("192.168.") {
                     "/24" // Private Class C
                 } else if ip.starts_with("169.254.") {
                     "/16" // Link-local
+                } else if is_tailscale {
+                    "/32" // Tailscale IPs are typically /32
                 } else {
                     "/24" // Default assumption
+                };
+                
+                // Determine IP role and priority
+                let ip_role = if is_mgmt {
+                    Some("vip".to_string()) // Management/OOB IPs are VIPs
+                } else if is_tailscale {
+                    Some("anycast".to_string()) // Tailscale is overlay/anycast
+                } else if nic.name.starts_with("eth0") || nic.name.starts_with("eno1") || 
+                         nic.name.starts_with("enp") || interface_count == 1 {
+                    Some("loopback".to_string()) // Primary interface
+                } else {
+                    Some("secondary".to_string()) // Additional interfaces
+                };
+                
+                let description = if is_mgmt {
+                    "Out-of-band Management IP".to_string()
+                } else if is_tailscale {
+                    "Tailscale VPN IP".to_string()
+                } else {
+                    "Primary Network IP".to_string()
                 };
                 
                 let netbox_ip = NetBoxIPAddress {
@@ -731,33 +875,54 @@ pub async fn sync_to_netbox(
                     vrf: None,
                     tenant: None,
                     status: "active".to_string(),
-                    role: if is_mgmt { 
-                        Some("vip".to_string()) // Management/OOB IPs are VIPs
-                    } else if interface_count == 1 || nic.name.starts_with("eth0") || nic.name.starts_with("eno1") {
-                        Some("loopback".to_string()) // Primary interface
-                    } else {
-                        Some("secondary".to_string()) // Additional interfaces
-                    },
+                    role: ip_role,
                     assigned_object_type: Some("dcim.interface".to_string()),
                     assigned_object_id: Some(interface_id),
                     nat_inside: None,
                     nat_outside: None,
-                    dns_name: if !is_mgmt { Some(server_info.fqdn.clone()) } else { 
-                        Some(format!("{}-{}.{}", server_info.hostname, if is_mgmt { "mgmt" } else { "oob" }, "example.com"))
+                    dns_name: if !is_mgmt { 
+                        Some(server_info.fqdn.clone()) 
+                    } else { 
+                        Some(format!("{}-{}.example.com", server_info.hostname, 
+                            if is_tailscale { "ts" } else { "mgmt" }))
                     },
-                    description: Some(format!("{} IP", if is_mgmt { "Out-of-band Management" } else { "Inband Primary" })),
-                    comments: None,
+                    description: Some(description),
+                    comments: if is_tailscale { 
+                        Some("Tailscale mesh VPN address".to_string()) 
+                    } else { 
+                        None 
+                    },
                     tags: None,
-                    custom_fields: None,
+                    custom_fields: {
+                        let mut cf = HashMap::new();
+                        if is_tailscale {
+                            cf.insert("network_type".to_string(), serde_json::Value::String("Tailscale VPN".to_string()));
+                        }
+                        if cf.is_empty() { None } else { Some(cf) }
+                    },
                 };
                 
                 let ip_id = client.create_ip_address(&netbox_ip).await?;
-                println!("Created IP address {} (ID: {})", netbox_ip.address, ip_id);
+                println!("Created IP address {} (ID: {}) - {}", 
+                    netbox_ip.address, ip_id, 
+                    if is_tailscale { "Tailscale" } else if is_mgmt { "Management" } else { "Primary" }
+                );
                 
-                // Set as primary IP if this is the main production interface
-                if !is_mgmt && primary_ip4_id.is_none() && 
-                   (nic.name.starts_with("eth0") || nic.name.starts_with("eno1") || interface_count == 1) {
+                // Set as primary IP with proper priority:
+                // 1. Tailscale IPs have highest priority for primary IP
+                // 2. Then primary interfaces (eth0, eno1, etc.)
+                // 3. Skip management interfaces for primary IP
+                if !is_mgmt && (
+                    (is_tailscale && primary_ip4_id.is_none()) ||
+                    (primary_ip4_id.is_none() && (
+                        nic.name.starts_with("eth0") || 
+                        nic.name.starts_with("eno1") || 
+                        nic.name.starts_with("enp") ||
+                        interface_count == 1
+                    ))
+                ) {
                     primary_ip4_id = Some(ip_id);
+                    println!("Set as primary IP: {} ({})", ip, if is_tailscale { "Tailscale" } else { "Standard" });
                 }
             }
         }
