@@ -35,13 +35,16 @@ use std::collections::{HashMap, HashSet};
 use std::error::Error;
 use std::process::Command;
 
+pub mod posting;
+pub mod netbox;
+
 lazy_static! {
     static ref STORAGE_SIZE_RE: Regex = Regex::new(r"(\d+(?:\.\d+)?)(B|K|M|G|T)").unwrap();
     static ref NETWORK_SPEED_RE: Regex = Regex::new(r"Speed:\s+(\S+)").unwrap();
 }
 
 /// CPU topology information
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CpuTopology {
     pub total_cores: u32,
     pub total_threads: u32,
@@ -53,7 +56,7 @@ pub struct CpuTopology {
 }
 
 /// Motherboard information
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MotherboardInfo {
     pub manufacturer: String,
     pub product_name: String,
@@ -64,7 +67,7 @@ pub struct MotherboardInfo {
     pub type_: String,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SystemInfo {
     pub uuid: String,
     pub serial: String,
@@ -73,7 +76,7 @@ pub struct SystemInfo {
 }
 
 /// Summary of key system components
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SystemSummary {
     /// System information
     pub system_info: SystemInfo,
@@ -106,7 +109,7 @@ pub struct SystemSummary {
 }
 
 /// BIOS information
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BiosInfo {
     pub vendor: String,
     pub version: String,
@@ -115,7 +118,7 @@ pub struct BiosInfo {
 }
 
 /// Chassis information
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ChassisInfo {
     pub manufacturer: String,
     pub type_: String,
@@ -123,7 +126,7 @@ pub struct ChassisInfo {
 }
 
 /// Represents the overall server information
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ServerInfo {
     /// System summary
     pub summary: SystemSummary,
@@ -138,7 +141,7 @@ pub struct ServerInfo {
 }
 
 /// Contains detailed hardware information
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct HardwareInfo {
     /// CPU information.
     pub cpu: CpuInfo,
@@ -151,7 +154,7 @@ pub struct HardwareInfo {
 }
 
 /// Represents CPU information.
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CpuInfo {
     /// CPU model name.
     pub model: String,
@@ -166,7 +169,7 @@ pub struct CpuInfo {
 }
 
 /// Represents memory information.
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MemoryInfo {
     /// Total memory size.
     pub total: String,
@@ -179,7 +182,7 @@ pub struct MemoryInfo {
 }
 
 /// Represents a memory module.
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MemoryModule {
     /// Size of the memory module.
     pub size: String,
@@ -196,14 +199,14 @@ pub struct MemoryModule {
 }
 
 /// Represents storage information.
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct StorageInfo {
     /// List of storage devices.
     pub devices: Vec<StorageDevice>,
 }
 
 /// Represents a storage device.
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct StorageDevice {
     /// Device name.
     pub name: String,
@@ -216,14 +219,14 @@ pub struct StorageDevice {
 }
 
 /// Represents GPU information.
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GpuInfo {
     /// List of GPU devices.
     pub devices: Vec<GpuDevice>,
 }
 
 /// Represents a GPU device.
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GpuDevice {
     /// GPU index
     pub index: u32,
@@ -242,7 +245,7 @@ pub struct GpuDevice {
 }
 
 /// Represents a NUMA node
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct NumaNode {
     /// Node ID
     pub id: i32,
@@ -257,7 +260,7 @@ pub struct NumaNode {
 }
 
 /// Represents a device attached to a NUMA node
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct NumaDevice {
     /// Device type (GPU, NIC, etc.)
     pub type_: String,
@@ -268,7 +271,7 @@ pub struct NumaDevice {
 }
 
 /// Represents network information.
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct NetworkInfo {
     /// List of network interfaces.
     pub interfaces: Vec<NetworkInterface>,
@@ -277,7 +280,7 @@ pub struct NetworkInfo {
 }
 
 /// Represents a network interface.
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct NetworkInterface {
     /// Interface name.
     pub name: String,
@@ -296,14 +299,14 @@ pub struct NetworkInterface {
 }
 
 /// Represents Infiniband information.
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct InfinibandInfo {
     /// List of Infiniband interfaces.
     pub interfaces: Vec<IbInterface>,
 }
 
 /// Represents an Infiniband interface.
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct IbInterface {
     /// Interface name.
     pub name: String,
@@ -320,9 +323,7 @@ pub struct NumaInfo {
     pub nodes: Vec<NumaNode>,
 }
 
-pub mod posting;
-
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct InterfaceIPs {
     pub interface: String,
     pub ip_addresses: Vec<String>,

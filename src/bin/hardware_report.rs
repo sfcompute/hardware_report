@@ -82,6 +82,30 @@ struct Opt {
     /// No summary output to console
     #[structopt(long)]
     noout: bool,
+
+    /// Enable NetBox integration
+    #[structopt(long)]
+    netbox: bool,
+
+    /// NetBox URL (required with --netbox)
+    #[structopt(long, env = "NETBOX_URL")]
+    netbox_url: Option<String>,
+
+    /// NetBox API token (required with --netbox)
+    #[structopt(long, env = "NETBOX_TOKEN")]
+    netbox_token: Option<String>,
+
+    /// NetBox site name (default: "Digital Ocean")
+    #[structopt(long, default_value = "Digital Ocean")]
+    netbox_site: String,
+
+    /// NetBox device role (default: "production")
+    #[structopt(long, default_value = "production")]
+    netbox_role: String,
+
+    /// Dry run mode for NetBox (preview changes without applying)
+    #[structopt(long)]
+    netbox_dry_run: bool,
 }
 
 fn parse_label(s: &str) -> Result<(String, String), String> {
@@ -279,7 +303,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
     if opt.post {
         let labels: HashMap<String, String> = opt.labels.into_iter().collect();
         post_data(
-            server_info,
+            &server_info,
             labels,
             &opt.endpoint,
             opt.auth_token.as_deref(),
@@ -288,6 +312,37 @@ async fn main() -> Result<(), Box<dyn Error>> {
         )
         .await?;
         println!("\nSuccessfully posted data to remote server");
+    }
+
+    // Handle NetBox integration if enabled
+    if opt.netbox {
+        if opt.netbox_url.is_none() {
+            eprintln!("Error: --netbox-url is required when using --netbox");
+            std::process::exit(1);
+        }
+        if opt.netbox_token.is_none() {
+            eprintln!("Error: --netbox-token is required when using --netbox");
+            std::process::exit(1);
+        }
+
+        use hardware_report::netbox::sync_to_netbox;
+        
+        sync_to_netbox(
+            &server_info,
+            opt.netbox_url.as_ref().unwrap(),
+            opt.netbox_token.as_ref().unwrap(),
+            Some(&opt.netbox_site),
+            Some(&opt.netbox_role),
+            opt.skip_tls_verify,
+            opt.netbox_dry_run,
+        )
+        .await?;
+        
+        if opt.netbox_dry_run {
+            println!("\nNetBox dry run completed - no changes were made");
+        } else {
+            println!("\nSuccessfully synchronized data to NetBox");
+        }
     }
 
     Ok(())

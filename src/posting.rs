@@ -17,7 +17,7 @@ pub struct PostPayload {
 }
 
 pub async fn post_data(
-    data: ServerInfo,
+    data: &ServerInfo,
     labels: HashMap<String, String>,
     endpoint: &str,
     auth_token: Option<&str>,
@@ -26,7 +26,7 @@ pub async fn post_data(
 ) -> Result<(), Box<dyn Error>> {
     let payload = PostPayload {
         labels,
-        result: data,
+        result: data.clone(), // Clone for serialization
     };
 
     // Write payload to file if path is provided
