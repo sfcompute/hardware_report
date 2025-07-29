@@ -56,6 +56,7 @@ pub struct NetBoxDevice {
     pub airflow: Option<String>, // "front-to-rear", "rear-to-front", etc.
     pub primary_ip4: Option<u32>, // ID of primary IPv4
     pub primary_ip6: Option<u32>, // ID of primary IPv6
+    pub oob_ip: Option<u32>, // Out-of-band IP address ID (reference to IP address object)
     pub cluster: Option<u32>, // ID of cluster
     pub virtual_chassis: Option<u32>,
     pub vc_position: Option<u32>,
@@ -332,7 +333,31 @@ impl NetBoxClient {
         if let Some(results) = data["results"].as_array() {
             if !results.is_empty() {
                 if let Some(id) = results[0]["id"].as_u64() {
-                    return Ok(id as u32);
+                    let device_type_id = id as u32;
+                    
+                    // Check if u_height needs to be updated to 4U
+                    if let Some(current_height) = results[0]["u_height"].as_f64() {
+                        if (current_height - u_height as f64).abs() > 0.1 {
+                            // Update the device type height
+                            let update_payload = serde_json::json!({
+                                "u_height": u_height
+                            });
+                            
+                            let update_url = format!("{}/api/dcim/device-types/{}/", self.base_url, device_type_id);
+                            let update_response = self.client
+                                .patch(&update_url)
+                                .header("Authorization", format!("Token {}", self.token))
+                                .json(&update_payload)
+                                .send()
+                                .await?;
+                            
+                            if update_response.status().is_success() {
+                                println!("Updated device type {} height to {}U", model, u_height);
+                            }
+                        }
+                    }
+                    
+                    return Ok(device_type_id);
                 }
             }
         }
@@ -596,7 +621,31 @@ pub async fn sync_to_netbox(
         }
     }
     
-    // Create or update device
+    // Create or update device - need to build this manually to include BMC fields
+    let mut device_data = serde_json::json!({
+        "name": server_info.fqdn,
+        "device_type": device_type_id,
+        "device_role": device_role_id,
+        "serial": server_info.summary.chassis.serial,
+        "site": site_id,
+        "face": "front",
+        "status": "active",
+        "airflow": "front-to-rear",
+        "description": format!("{} @ {}", model, site),
+        "comments": format!("Auto-imported by hardware_report\nUUID: {}", server_info.summary.system_info.uuid),
+        "custom_fields": custom_fields
+    });
+    
+    // Add BMC information directly to device fields
+    if let Some(bmc_ip) = &server_info.bmc_ip {
+        if bmc_ip != "0.0.0.0" {
+            device_data["oob_ip"] = serde_json::Value::String(bmc_ip.clone());
+        }
+    }
+    
+    // Note: NetBox typically doesn't have a direct BMC MAC field on devices
+    // The MAC will be associated with the BMC interface we create
+    
     let device = NetBoxDevice {
         name: server_info.fqdn.clone(),
         device_type: device_type_id,
@@ -612,6 +661,7 @@ pub async fn sync_to_netbox(
         airflow: Some("front-to-rear".to_string()),
         primary_ip4: None, // Will be set after creating IPs
         primary_ip6: None,
+        oob_ip: None, // Will be set to BMC IP ID if available
         cluster: None,
         virtual_chassis: None,
         vc_position: None,
@@ -635,6 +685,7 @@ pub async fn sync_to_netbox(
     
     // Create BMC interface first if BMC information is available
     let mut bmc_interface_id = None;
+    let mut bmc_ip_id = None;
     if let (Some(bmc_ip), Some(bmc_mac)) = (&server_info.bmc_ip, &server_info.bmc_mac) {
         if bmc_ip != "0.0.0.0" && bmc_mac != "00:00:00:00:00:00" {
             let bmc_interface = NetBoxInterface {
@@ -709,8 +760,8 @@ pub async fn sync_to_netbox(
                 custom_fields: None,
             };
             
-            let bmc_ip_id = client.create_ip_address(&bmc_netbox_ip).await?;
-            println!("Created BMC IP address {} (ID: {})", bmc_netbox_ip.address, bmc_ip_id);
+            bmc_ip_id = Some(client.create_ip_address(&bmc_netbox_ip).await?);
+            println!("Created BMC IP address {} (ID: {})", bmc_netbox_ip.address, bmc_ip_id.unwrap());
         }
     }
     
@@ -928,20 +979,35 @@ pub async fn sync_to_netbox(
         }
     }
     
-    // Update device with primary IP if found
+    // Update device with primary IP and BMC information if found
+    let mut update_payload = serde_json::json!({});
+    
     if let Some(primary_ip) = primary_ip4_id {
-        let update_payload = serde_json::json!({
-            "primary_ip4": primary_ip
-        });
-        
+        update_payload["primary_ip4"] = serde_json::Value::Number(primary_ip.into());
+        println!("Setting primary IPv4 to ID: {}", primary_ip);
+    }
+    
+    // Set BMC IP as out-of-band IP if we created one
+    if let Some(bmc_ip_ref) = bmc_ip_id {
+        update_payload["oob_ip"] = serde_json::Value::Number(bmc_ip_ref.into());
+        println!("Setting out-of-band IP to BMC IP ID: {}", bmc_ip_ref);
+    }
+    
+    // Only update if we have changes to make
+    if !update_payload.as_object().unwrap().is_empty() {
         let update_url = format!("{}/api/dcim/devices/{}/", client.base_url, device_id);
-        let _response = client.client
+        let response = client.client
             .patch(&update_url)
             .header("Authorization", format!("Token {}", client.token))
             .json(&update_payload)
             .send()
             .await?;
-        println!("Updated device primary IP");
+        
+        if response.status().is_success() {
+            println!("Successfully updated device with IP assignments");
+        } else {
+            println!("Warning: Failed to update device IP assignments: {}", response.status());
+        }
     }
     
     // Create inventory items for components
