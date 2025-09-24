@@ -1,5 +1,10 @@
 {
   description = "Hardware Report - A tool for generating hardware information reports";
+  
+  nixConfig = {
+    extra-substituters = [ "https://cache.nixos.org/" ];
+    extra-trusted-public-keys = [ "cache.nixos.org-1:6NCHdD59X431o0gWypbMrAURkbJ16ZPMQFGspcDShjY=" ];
+  };
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
@@ -37,11 +42,14 @@
         
         # Runtime dependencies that the binary needs
         runtimeDeps = with pkgs; [
-          numactl
+          # Cross-platform tools
           ipmitool
+          pciutils    # for lspci
+        ] ++ lib.optionals stdenv.isLinux [
+          # Linux-only tools
+          numactl
           ethtool
           util-linux  # for lscpu
-          pciutils    # for lspci
           dmidecode   # for system/BIOS/memory information
         ];
         
@@ -255,8 +263,16 @@ EOF
             echo "Run 'cargo build' to build the project"
             echo "Run 'cargo run' to run the project"
             echo ""
-            echo "Runtime dependencies are available in PATH:"
-            echo "- numactl, ipmitool, ethtool, lscpu, lspci, dmidecode"
+            echo "Runtime dependencies available in PATH:"
+            echo "- ipmitool, pciutils (lspci)"
+            ${if pkgs.stdenv.isLinux then ''
+            echo "- numactl, ethtool, util-linux (lscpu), dmidecode"
+            '' else ''
+            echo "- (Linux-only tools like numactl, ethtool not available on Darwin)"
+            ''}
+            echo ""
+            echo "Platform: ${pkgs.stdenv.hostPlatform.system}"
+            echo "Rust toolchain: ${rustToolchain.version}"
           '';
         };
         

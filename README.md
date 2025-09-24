@@ -180,7 +180,27 @@ echo "Build complete! Run with: sudo ./target/release/hardware_report" && \
 sudo ./target/release/hardware_report
 ```
 
-### Option 3: Pre-built Releases (Recommended for Quick Setup)
+### Option 3: Direct Flake Installation (Nix Users)
+
+**Install directly from GitHub without cloning:**
+```bash
+# Install to user profile
+nix profile install github:sfcompute/hardware_report
+
+# Run directly without installing
+nix run github:sfcompute/hardware_report
+
+# Use in a nix shell
+nix shell github:sfcompute/hardware_report
+```
+
+**Benefits:**
+- No need to clone the repository
+- Always uses the latest committed version
+- Automatic dependency management
+- Clean integration with existing Nix workflows
+
+### Option 4: Pre-built Releases (Recommended for Quick Setup)
 
 Instead of building from source, you can download pre-built binaries and Debian packages from our [GitHub Releases](https://github.com/sfcompute/hardware_report/releases) page.
 
