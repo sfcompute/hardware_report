@@ -268,6 +268,8 @@ pub struct NetworkInterface {
     pub mac: String,
     /// IP address
     pub ip: String,
+    /// IP prefix
+    pub prefix: String,
     /// Interface speed
     pub speed: Option<String>,
     /// Interface type
