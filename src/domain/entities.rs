@@ -159,21 +159,6 @@ pub struct HardwareInfo {
     pub gpus: GpuInfo,
 }
 
-/// CPU information
-#[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct CpuInfo {
-    /// CPU model name
-    pub model: String,
-    /// Number of cores per socket
-    pub cores: u32,
-    /// Number of threads per core
-    pub threads: u32,
-    /// Number of sockets
-    pub sockets: u32,
-    /// CPU speed
-    pub speed: String,
-}
-
 /// Memory information
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct MemoryInfo {
@@ -202,6 +187,9 @@ pub struct MemoryModule {
     pub manufacturer: String,
     /// Serial number
     pub serial: String,
+    pub part_number: Option<String>,
+    pub rank: Option<u32>,
+    pub configured_voltage: Option<u32>,
 }
 
 /// Storage information
@@ -210,8 +198,6 @@ pub struct StorageInfo {
     /// List of storage devices
     pub devices: Vec<StorageDevice>,
 }
-
-
 
 /// GPU device information
 ///
@@ -264,8 +250,6 @@ pub struct GpuDevice {
     pub detection_method: String,
 }
 
-
-
 /// GPU information
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct GpuInfo {
@@ -301,7 +285,7 @@ pub enum StorageType {
     /// Embedded MMC Storage
     Emmc,
 
-    /// Unknown or unclassified storage type 
+    /// Unknown or unclassified storage type
     Unknown,
 }
 
@@ -328,6 +312,12 @@ pub struct NetworkInterface {
     pub pci_id: String,
     /// NUMA node
     pub numa_node: Option<i32>,
+    pub driver: Option<String>,           
+    pub driver_version: Option<String>,   
+    pub firmware_version: Option<String>, 
+    pub mtu: u32,                         
+    pub is_up: bool,                      
+    pub is_virtual: bool,                 
 }
 
 /// Storage device information
@@ -352,7 +342,7 @@ pub struct StorageDevice {
     /// Device type classification
     pub device_type: StorageType,
 
-    /// Legacy type field 
+    /// Legacy type field
     #[deprecated(since = "0.2.0", note = "Use device_type instead")]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub type_: Option<String>,
@@ -360,7 +350,7 @@ pub struct StorageDevice {
     /// Device size in bytes
     pub size_bytes: u64,
 
-    /// Device size in gigabyes 
+    /// Device size in gigabyes
     pub size_gb: f64,
 
     /// Legacy size field as string (deprecated)
@@ -388,7 +378,56 @@ pub struct StorageDevice {
 
     /// Detection method used
     pub detection_method: String,
+}
 
+/// # Detection Methods
+///
+/// CPU information is gathered from multiple sources:
+/// 1. sysfs /sys/devices/system/cpu - frequency and cache (Linux)
+/// 2. /proc/cpuinfo - model and features (Linux)
+/// 3. raw-cpuid crate - x86 CPUID instruction
+/// 4. lscpu command - topology information
+/// 5. dmidecode - SMBIOS data (requires privileges)
+/// 6. sysinfo crate - cross-platform fallback
+///
+/// # References
+///
+/// - [Linux CPU sysfs Interface](https://www.kernel.org/doc/Documentation/cpu-freq/user-guide.rst)
+/// - [Intel CPUID Reference](https://www.intel.com/content/www/us/en/developer/articles/technical/intel-sdm.html)
+/// - [ARM CPU Identification](https://developer.arm.com/documentation/ddi0487/latest)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CpuInfo {
+    /// Cpu Model (AMD, Intel)
+    pub model: String,
+
+    /// CPu Vendor
+    pub vendor: String,
+
+    /// Number of phyiscal cores per socket
+    pub cores: u32,
+
+    /// Number of threads per core
+    pub threads: u32,
+
+    /// Number of CPU sockets
+    pub sockets: u32,
+
+    /// CPU frequencies in MHz (uccrent or max)
+    pub frequency_mhz: u32,
+
+    /// Legacy speed field as string (deprecated)
+    #[deprecated(since = "0.2.0", note = "Use frequency_mhz instead")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub speed: Option<String>,
+
+    /// CPU architecture
+    pub arhitecture: String,
+
+    /// LI data cache size in kilobytes (per core)
+    pub cache_l1d_kb: Option<u32>,
+
+    /// L1 instruction cache size in kilobytes (per core)
+    pub cache_l1li_kb: Option<u32>,
 }
 
 /// Infiniband information
