@@ -19,6 +19,20 @@ clap = { version = "4.4", features = [
     "derive",
 ] } # For command line argument parsing
 thiserror = "1.0" # For error handling
+# Requires Nvidia driver at runtime
+nvml-wrapper = { version = "0.11.0", optional = true}
+
+# Only compiled on x86/x86_64 targets
+[target.'cfg(any(target_arch = "x86", target_arch = "x86_64"))'.dependencies]
+raw-cpuid = { version = "11", optional = true }
+
+[features]
+default = []
+nvidia = ["nvml-wrapper"]
+x86-cpu = ["raw-cpuid"]
+full = ["nvidia", "x86-cpu"]
+
+# Requires Nvidia driver at runtime
 log = "0.4" # For logging
 env_logger = "0.11.5" # For logging implementation
 regex = "1.11.1"
