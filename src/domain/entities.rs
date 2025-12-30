@@ -211,18 +211,60 @@ pub struct StorageInfo {
     pub devices: Vec<StorageDevice>,
 }
 
-/// Storage device information
-#[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct StorageDevice {
-    /// Device name
+
+
+/// GPU device information
+///
+/// Represents a discrete or integrated GPU detected in the system.
+/// Memory values are provided in megabytes as unsigned integers for
+/// reliable parsing by CMDB consumers.
+///
+/// # Detection Methods
+///
+/// GPUs are detected using multiple methods in priority order:
+/// 1. NVML (NVIDIA Management Library) - most accurate for NVIDIA GPUs
+/// 2. nvidia-smi command - fallback for NVIDIA when NVML unavailable
+/// 3. ROCm SMI - AMD GPU detection
+/// 4. sysfs /sys/class/drm - Linux DRM subsystem
+/// 5. lspci - PCI device enumeration
+/// 6. sysinfo crate - cross-platform fallback
+///
+/// # References
+///
+/// - [NVIDIA NVML Documentation](https://developer.nvidia.com/nvidia-management-library-nvml)
+/// - [Linux DRM Subsystem](https://www.kernel.org/doc/html/latest/gpu/drm-uapi.html)
+/// - [PCI ID Database](https://pci-ids.ucw.cz/)
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct GpuDevice {
+    /// GPU index (0-based)
+    pub index: u32,
+
+    /// GPU product name
     pub name: String,
-    /// Device type (e.g., ssd, hdd)
-    pub type_: String,
-    /// Device size
-    pub size: String,
-    /// Device model
-    pub model: String,
+
+    /// GPU UUUD
+    pub uuid: String,
+
+    /// Vendor name
+    pub vendor: String,
+
+    /// Driver Version
+    pub driver_version: Option<String>,
+
+    /// CUDA compute capability for Nvidia gpus
+    pub compute_capability: Option<String>,
+
+    /// GPU architecturr (Hopper, Ada LoveLace)
+    pub architecture: Option<String>,
+
+    /// NUMA node affiniity (-1 if not applicable)
+    pub numa_node: Option<i32>,
+
+    /// Detection method used to dsicover this GPU
+    pub detection_method: String,
 }
+
+
 
 /// GPU information
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -230,26 +272,6 @@ pub struct GpuInfo {
     /// List of GPU devices
     pub devices: Vec<GpuDevice>,
 }
-
-/// GPU device information
-#[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct GpuDevice {
-    /// GPU index
-    pub index: u32,
-    /// GPU name
-    pub name: String,
-    /// GPU UUID
-    pub uuid: String,
-    /// Total GPU memory
-    pub memory: String,
-    /// PCI ID (vendor:device) or Apple Fabric for Apple Silicon
-    pub pci_id: String,
-    /// Vendor name
-    pub vendor: String,
-    /// NUMA node
-    pub numa_node: Option<i32>,
-}
-
 /// Network information
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct NetworkInfo {
@@ -257,6 +279,30 @@ pub struct NetworkInfo {
     pub interfaces: Vec<NetworkInterface>,
     /// Infiniband information, if available
     pub infiniband: Option<InfinibandInfo>,
+}
+
+/// Storage device type classification
+///
+/// # References
+///
+/// - [Linux Block Device Documentation](https://www.kernel.org/doc/html/latest/block/index.html)
+/// - [NVMe Specification](https://nvmexpress.org/specifications/)
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub enum StorageType {
+    /// NVMe ssd
+    Nvme,
+
+    /// SATA/SAS ssd
+    Ssd,
+
+    /// Hard disk (rotational)
+    Hdd,
+
+    /// Embedded MMC Storage
+    Emmc,
+
+    /// Unknown or unclassified storage type 
+    Unknown,
 }
 
 /// Network interface information
@@ -282,6 +328,67 @@ pub struct NetworkInterface {
     pub pci_id: String,
     /// NUMA node
     pub numa_node: Option<i32>,
+}
+
+/// Storage device information
+///
+/// # Detection Methods
+///
+/// Storage devices are detected using multiple methods in priority order:
+/// 1. sysfs /sys/block - direct kernel interface (Linux)
+/// 2. lsblk command - block device listing
+/// 3. sysinfo crate - cross-platform fallback
+/// 4. diskutil (macOS)
+///
+/// # References
+///
+/// - [Linux sysfs Block Devices](https://www.kernel.org/doc/Documentation/ABI/testing/sysfs-block)
+/// - [SMART Attributes](https://en.wikipedia.org/wiki/S.M.A.R.T.)
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct StorageDevice {
+    /// Device name (nvme0n1, sda etc..,)
+    pub name: String,
+
+    /// Device type classification
+    pub device_type: StorageType,
+
+    /// Legacy type field 
+    #[deprecated(since = "0.2.0", note = "Use device_type instead")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub type_: Option<String>,
+
+    /// Device size in bytes
+    pub size_bytes: u64,
+
+    /// Device size in gigabyes 
+    pub size_gb: f64,
+
+    /// Legacy size field as string (deprecated)
+    #[deprecated(since = "0.2.0", note = "Use size_bytes or size_gb instead")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub size: Option<String>,
+
+    /// Device model name
+    pub model: String,
+
+    /// Device serial number (may require elevated privileges)
+    pub serial_number: Option<String>,
+
+    /// Device firmware version
+    pub firmware_version: Option<String>,
+
+    /// Interface type (e.g., "NVMe", "SATA", "SAS", "eMMC")
+    pub interface: String,
+
+    /// Whether the device is rotational (true = HDD, false = SSD/NVMe)
+    pub is_rotational: bool,
+
+    /// WWN (World Wide Name) if available
+    pub wwn: Option<String>,
+
+    /// Detection method used
+    pub detection_method: String,
+
 }
 
 /// Infiniband information
