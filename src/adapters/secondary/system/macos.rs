@@ -161,6 +161,7 @@ impl SystemInfoProvider for MacOSSystemInfoProvider {
                     pci_id: "Apple Fabric (Integrated)".to_string(),
                     vendor: "Apple".to_string(),
                     numa_node: None,
+                    ..Default::default()
                 });
                 gpu_index += 1;
             }
@@ -176,6 +177,7 @@ impl SystemInfoProvider for MacOSSystemInfoProvider {
                 pci_id: "Apple Fabric (Integrated)".to_string(),
                 vendor: "Apple".to_string(),
                 numa_node: None,
+                ..Default::default()
             });
         }
 

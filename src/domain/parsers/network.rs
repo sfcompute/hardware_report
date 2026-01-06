@@ -36,6 +36,7 @@ pub fn parse_ip_output(ip_output: &str) -> Result<Vec<NetworkInterface>, String>
                 model: "Unknown".to_string(),
                 pci_id: "Unknown".to_string(),
                 numa_node: None,
+                ..Default::default()
             });
         }
     }
@@ -91,6 +92,7 @@ pub fn parse_macos_network_info(ifconfig_output: &str) -> Result<Vec<NetworkInte
                     model: model.to_string(),
                     pci_id,
                     numa_node: None,
+                    ..Default::default()
                 });
             }
         } else if let Some(ref mut interface) = current_interface {

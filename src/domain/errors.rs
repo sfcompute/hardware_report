@@ -139,12 +139,16 @@ pub enum SystemError {
     CommandNotFound(String),
     /// Permission denied
     PermissionDenied(String),
-    /// I/O operation failed
+    /// I/O operation failed (simple)
     IoError(String),
+    /// I/O operation failed (with path context)
+    IoErrorWithPath { path: String, message: String },
     /// Parsing error
     ParseError(String),
     /// Timeout
     Timeout(String),
+    /// Resource not available
+    NotAvailable { resource: String },
 }
 
 impl fmt::Display for SystemError {
@@ -167,8 +171,14 @@ impl fmt::Display for SystemError {
             SystemError::CommandNotFound(cmd) => write!(f, "Command not found: {cmd}"),
             SystemError::PermissionDenied(msg) => write!(f, "Permission denied: {msg}"),
             SystemError::IoError(msg) => write!(f, "I/O error: {msg}"),
+            SystemError::IoErrorWithPath { path, message } => {
+                write!(f, "I/O error at '{}': {}", path, message)
+            }
             SystemError::ParseError(msg) => write!(f, "Parse error: {msg}"),
             SystemError::Timeout(msg) => write!(f, "Timeout: {msg}"),
+            SystemError::NotAvailable { resource } => {
+                write!(f, "Resource not available: {}", resource)
+            }
         }
     }
 }
@@ -189,8 +199,14 @@ impl From<SystemError> for DomainError {
             SystemError::IoError(msg) => {
                 DomainError::SystemInfoUnavailable(format!("I/O error: {msg}"))
             }
+            SystemError::IoErrorWithPath { path, message } => {
+                DomainError::SystemInfoUnavailable(format!("I/O error at '{}': {}", path, message))
+            }
             SystemError::ParseError(msg) => DomainError::ParsingFailed(msg),
             SystemError::Timeout(msg) => DomainError::Timeout(msg),
+            SystemError::NotAvailable { resource } => {
+                DomainError::SystemInfoUnavailable(format!("Resource not available: {}", resource))
+            }
         }
     }
 }

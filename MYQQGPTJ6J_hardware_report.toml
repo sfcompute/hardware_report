@@ -8,17 +8,17 @@ memory_config = "LPDDR5 @ Integrated"
 total_storage = "2.0 TB"
 total_storage_tb = 1.81464035063982
 filesystems = [
-    "/dev/disk3s1s1 (apfs) - 1.9T total, 262G used, 1.6T available, mounted on /",
-    "/dev/disk3s6 (apfs) - 1.9T total, 262G used, 1.6T available, mounted on /System/Volumes/VM",
-    "/dev/disk3s2 (apfs) - 1.9T total, 262G used, 1.6T available, mounted on /System/Volumes/Preboot",
-    "/dev/disk3s4 (apfs) - 1.9T total, 262G used, 1.6T available, mounted on /System/Volumes/Update",
-    "/dev/disk1s2 (apfs) - 500M total, 19M used, 482M available, mounted on /System/Volumes/xarts",
-    "/dev/disk1s1 (apfs) - 500M total, 19M used, 482M available, mounted on /System/Volumes/iSCPreboot",
-    "/dev/disk1s3 (apfs) - 500M total, 19M used, 482M available, mounted on /System/Volumes/Hardware",
-    "/dev/disk3s7 (apfs) - 1.9T total, 262G used, 1.6T available, mounted on /nix",
+    "/dev/disk3s1s1 (apfs) - 1.9T total, 1.3T used, 615G available, mounted on /",
+    "/dev/disk3s6 (apfs) - 1.9T total, 1.3T used, 615G available, mounted on /System/Volumes/VM",
+    "/dev/disk3s2 (apfs) - 1.9T total, 1.3T used, 615G available, mounted on /System/Volumes/Preboot",
+    "/dev/disk3s4 (apfs) - 1.9T total, 1.3T used, 615G available, mounted on /System/Volumes/Update",
+    "/dev/disk1s2 (apfs) - 500M total, 20M used, 481M available, mounted on /System/Volumes/xarts",
+    "/dev/disk1s1 (apfs) - 500M total, 20M used, 481M available, mounted on /System/Volumes/iSCPreboot",
+    "/dev/disk1s3 (apfs) - 500M total, 20M used, 481M available, mounted on /System/Volumes/Hardware",
+    "/dev/disk3s7 (apfs) - 1.9T total, 1.3T used, 615G available, mounted on /nix",
 ]
 total_gpus = 1
-total_nics = 6
+total_nics = 8
 cpu_summary = "Apple M4 Max (1 Socket, 16 Cores/Socket, 1 Thread/Core, 1 NUMA Node)"
 
 [summary.system_info]
@@ -29,9 +29,9 @@ product_manufacturer = "Apple Inc."
 
 [summary.bios]
 vendor = "Apple Inc."
-version = "11881.121.1"
+version = "13822.41.1"
 release_date = "N/A"
-firmware_version = "11881.121.1"
+firmware_version = "13822.41.1"
 
 [summary.chassis]
 manufacturer = "Apple Inc."
@@ -41,7 +41,7 @@ serial = "MYQQGPTJ6J"
 [summary.motherboard]
 manufacturer = "Apple Inc."
 product_name = "Mac16,5"
-version = "11881.121.1"
+version = "13822.41.1"
 serial = "MYQQGPTJ6J"
 features = "Integrated"
 location = "System Board"
@@ -86,7 +86,7 @@ model = "APPLE SSD AP2048Z (Apple Fabric)"
 
 [[hardware.gpus.devices]]
 index = 0
-name = "Apple M4 Max (Metal 3)"
+name = "Apple M4 Max (Metal 4)"
 uuid = "macOS-GPU-0"
 memory = "Unified Memory (40 cores)"
 pci_id = "Apple Fabric (Integrated)"
@@ -96,6 +96,7 @@ vendor = "Apple"
 name = "en4"
 mac = "56"
 ip = "Unknown"
+prefix = "Unknown"
 speed = "1000 Mbps"
 type_ = "Ethernet"
 vendor = "Apple"
@@ -106,6 +107,7 @@ pci_id = "Apple Fabric (Integrated)"
 name = "en5"
 mac = "56"
 ip = "Unknown"
+prefix = "Unknown"
 speed = "1000 Mbps"
 type_ = "Ethernet"
 vendor = "Apple"
@@ -116,6 +118,7 @@ pci_id = "Apple Fabric (Integrated)"
 name = "en6"
 mac = "56"
 ip = "Unknown"
+prefix = "Unknown"
 speed = "1000 Mbps"
 type_ = "Ethernet"
 vendor = "Apple"
@@ -126,6 +129,7 @@ pci_id = "Apple Fabric (Integrated)"
 name = "bridge0"
 mac = "Unknown"
 ip = "Unknown"
+prefix = "Unknown"
 speed = "1000 Mbps"
 type_ = "Ethernet"
 vendor = "Apple"
@@ -136,6 +140,7 @@ pci_id = "Apple Fabric (Integrated)"
 name = "en0"
 mac = "84"
 ip = "192.168.1.90"
+prefix = "Unknown"
 speed = "1200 Mbps"
 type_ = "AirPort"
 vendor = "Apple"
@@ -143,9 +148,31 @@ model = "Wi-Fi 802.11 a/b/g/n/ac/ax"
 pci_id = "Apple Fabric (Integrated)"
 
 [[network.interfaces]]
+name = "en7"
+mac = "Unknown"
+ip = "Unknown"
+prefix = "Unknown"
+speed = "1000 Mbps"
+type_ = "Ethernet"
+vendor = "Apple"
+model = "Ethernet"
+pci_id = "Apple Fabric (Integrated)"
+
+[[network.interfaces]]
 name = "utun4"
 mac = "Unknown"
-ip = "100.84.190.125"
+ip = "100.112.156.46"
+prefix = "Unknown"
+type_ = "VPN (io.tailscale.ipn.macsys)"
+vendor = "Unknown"
+model = "Unknown"
+pci_id = "Unknown"
+
+[[network.interfaces]]
+name = "Tailscale 3"
+mac = "Unknown"
+ip = "Unknown"
+prefix = "Unknown"
 type_ = "VPN (io.tailscale.ipn.macos)"
 vendor = "Unknown"
 model = "Unknown"

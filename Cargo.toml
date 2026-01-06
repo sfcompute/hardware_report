@@ -26,6 +26,18 @@ toml = "0.8.19"
 libc = "0.2.161"
 tokio = { version = "1.0", features = ["full"] }
 async-trait = "0.1"
+# Requires Nvidia driver at runtime
+nvml-wrapper = { version = "0.11.0", optional = true}
+
+# Only compiled on x86/x86_64 targets
+[target.'cfg(any(target_arch = "x86", target_arch = "x86_64"))'.dependencies]
+raw-cpuid = { version = "11", optional = true }
+
+[features]
+default = []
+nvidia = ["nvml-wrapper"]
+x86-cpu = ["raw-cpuid"]
+full = ["nvidia", "x86-cpu"]
 
 [dev-dependencies]
 tempfile = "3.8"   # For temporary file handling in tests
