@@ -75,8 +75,8 @@ pub fn is_virtual_device(name: &str) -> bool {
 ///
 /// * `output` - JSON output from `lsblk -J -b -d -o NAME,SIZE,TYPE,MODEL,SERIAL,ROTA,TRAN,WWN`
 pub fn parse_lsblk_json(output: &str) -> Result<Vec<StorageDevice>, String> {
-    let json: serde_json::Value = serde_json::from_str(output)
-        .map_err(|e| format!("Failed to parse lsblk JSON: {}", e))?;
+    let json: serde_json::Value =
+        serde_json::from_str(output).map_err(|e| format!("Failed to parse lsblk JSON: {}", e))?;
 
     let blockdevices = json
         .get("blockdevices")
@@ -97,10 +97,7 @@ pub fn parse_lsblk_json(output: &str) -> Result<Vec<StorageDevice>, String> {
             continue;
         }
 
-        let size_bytes = device
-            .get("size")
-            .and_then(|v| v.as_u64())
-            .unwrap_or(0);
+        let size_bytes = device.get("size").and_then(|v| v.as_u64()).unwrap_or(0);
 
         // Skip small devices
         if size_bytes < 1_000_000_000 {

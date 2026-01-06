@@ -54,7 +54,7 @@ pub fn parse_sysfs_freq_khz(content: &str) -> Result<u32, String> {
 /// Size in KB.
 pub fn parse_sysfs_cache_size(content: &str) -> Result<u32, String> {
     let trimmed = content.trim();
-    
+
     if trimmed.ends_with('K') || trimmed.ends_with('k') {
         let value: u32 = trimmed[..trimmed.len() - 1]
             .parse()
@@ -83,12 +83,12 @@ pub fn parse_sysfs_cache_size(content: &str) -> Result<u32, String> {
 /// * `content` - Content of /proc/cpuinfo
 pub fn parse_proc_cpuinfo(content: &str) -> Result<CpuInfo, String> {
     let mut cpu_info = CpuInfo::default();
-    
+
     for line in content.lines() {
         if let Some((key, value)) = line.split_once(':') {
             let key = key.trim();
             let value = value.trim();
-            
+
             match key {
                 "vendor_id" => cpu_info.vendor = value.to_string(),
                 "model name" => {
@@ -115,7 +115,7 @@ pub fn parse_proc_cpuinfo(content: &str) -> Result<CpuInfo, String> {
             }
         }
     }
-    
+
     Ok(cpu_info)
 }
 

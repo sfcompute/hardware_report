@@ -34,35 +34,12 @@ limitations under the License.
 //! 3. Fallback: sysinfo crate (cross-platform)
 
 use crate::domain::{
-    combine_cpu_info,
-    determine_memory_speed,
-    determine_memory_type,
-    parse_dmidecode_bios_info,
-    parse_dmidecode_chassis_info,
-    parse_dmidecode_cpu,
-    parse_dmidecode_memory,
-    parse_dmidecode_system_info,
-    parse_free_output,
-    parse_hostname_output,
-    parse_ip_output,
-    parse_lscpu_output,
-    BiosInfo,
-    ChassisInfo,
-    CpuInfo,
-    GpuDevice,
-    GpuInfo,
-    GpuVendor,
-    MemoryInfo,
-    MotherboardInfo,
-    NetworkInfo,
-    NetworkInterface,
-    NetworkInterfaceType,
-    NumaNode,
-    StorageDevice,
-    StorageInfo,
-    StorageType,
-    SystemError,
-    SystemInfo,
+    combine_cpu_info, determine_memory_speed, determine_memory_type, parse_dmidecode_bios_info,
+    parse_dmidecode_chassis_info, parse_dmidecode_cpu, parse_dmidecode_memory,
+    parse_dmidecode_system_info, parse_free_output, parse_hostname_output, parse_ip_output,
+    parse_lscpu_output, BiosInfo, ChassisInfo, CpuInfo, GpuDevice, GpuInfo, GpuVendor, MemoryInfo,
+    MotherboardInfo, NetworkInfo, NetworkInterface, NetworkInterfaceType, NumaNode, StorageDevice,
+    StorageInfo, StorageType, SystemError, SystemInfo,
 };
 
 use crate::domain::parsers::storage::{
@@ -156,7 +133,11 @@ impl LinuxSystemInfoProvider {
             // Skip tiny devices (< 1GB)
             const MIN_SIZE: u64 = 1_000_000_000;
             if size_bytes < MIN_SIZE {
-                log::trace!("Skipping small device {}: {} bytes", device_name, size_bytes);
+                log::trace!(
+                    "Skipping small device {}: {} bytes",
+                    device_name,
+                    size_bytes
+                );
                 continue;
             }
 
@@ -273,13 +254,15 @@ impl LinuxSystemInfoProvider {
             ])
             .timeout(Duration::from_secs(10));
 
-        let output = self.command_executor.execute(&cmd).await.map_err(|e| {
-            SystemError::CommandFailed {
-                command: "lsblk".to_string(),
-                exit_code: None,
-                stderr: e.to_string(),
-            }
-        })?;
+        let output =
+            self.command_executor
+                .execute(&cmd)
+                .await
+                .map_err(|e| SystemError::CommandFailed {
+                    command: "lsblk".to_string(),
+                    exit_code: None,
+                    stderr: e.to_string(),
+                })?;
 
         if !output.success {
             return Err(SystemError::CommandFailed {
@@ -331,8 +314,12 @@ impl LinuxSystemInfoProvider {
         for sec_device in secondary {
             if let Some(pri_device) = primary.iter_mut().find(|d| d.name == sec_device.name) {
                 // Fill in missing fields from secondary
-                pri_device.serial_number = pri_device.serial_number.take().or(sec_device.serial_number);
-                pri_device.firmware_version = pri_device.firmware_version.take().or(sec_device.firmware_version);
+                pri_device.serial_number =
+                    pri_device.serial_number.take().or(sec_device.serial_number);
+                pri_device.firmware_version = pri_device
+                    .firmware_version
+                    .take()
+                    .or(sec_device.firmware_version);
                 pri_device.wwn = pri_device.wwn.take().or(sec_device.wwn);
 
                 if pri_device.model.is_empty() && !sec_device.model.is_empty() {
@@ -400,8 +387,9 @@ impl LinuxSystemInfoProvider {
                     iface.driver = Some(driver_str.clone());
 
                     // Driver version
-                    let version_path =
-                        PathBuf::from("/sys/module").join(&driver_str).join("version");
+                    let version_path = PathBuf::from("/sys/module")
+                        .join(&driver_str)
+                        .join("version");
                     if let Ok(version) = self.read_sysfs_file(&version_path) {
                         iface.driver_version = Some(version.trim().to_string());
                     }
@@ -527,7 +515,10 @@ impl SystemInfoProvider for LinuxSystemInfoProvider {
 
         // Enrich with lsblk
         if let Ok(lsblk_devices) = self.detect_storage_lsblk().await {
-            log::debug!("lsblk found {} devices for additional info", lsblk_devices.len());
+            log::debug!(
+                "lsblk found {} devices for additional info",
+                lsblk_devices.len()
+            );
             self.merge_storage_info(&mut devices, lsblk_devices);
         }
 
@@ -597,8 +588,7 @@ impl SystemInfoProvider for LinuxSystemInfoProvider {
                 if lspci_output.success {
                     let mut gpu_index = 0;
                     for line in lspci_output.stdout.lines() {
-                        if line.to_lowercase().contains("vga")
-                            || line.to_lowercase().contains("3d")
+                        if line.to_lowercase().contains("vga") || line.to_lowercase().contains("3d")
                         {
                             devices.push(GpuDevice {
                                 index: gpu_index,
@@ -634,8 +624,7 @@ impl SystemInfoProvider for LinuxSystemInfoProvider {
             }
         })?;
 
-        let mut interfaces =
-            parse_ip_output(&ip_output.stdout).map_err(SystemError::ParseError)?;
+        let mut interfaces = parse_ip_output(&ip_output.stdout).map_err(SystemError::ParseError)?;
 
         // Enrich with sysfs data
         for iface in &mut interfaces {

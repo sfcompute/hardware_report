@@ -108,7 +108,7 @@ pub fn parse_lspci_gpu_output(output: &str) -> Result<Vec<GpuDevice>, String> {
 
     for line in output.lines() {
         let line_lower = line.to_lowercase();
-        
+
         // Look for VGA compatible or 3D controller
         if !line_lower.contains("vga") && !line_lower.contains("3d") {
             continue;
@@ -116,7 +116,7 @@ pub fn parse_lspci_gpu_output(output: &str) -> Result<Vec<GpuDevice>, String> {
 
         // Extract PCI ID from brackets like [10de:2204]
         let pci_id = extract_pci_id(line);
-        
+
         // Determine vendor from PCI ID
         let (vendor_enum, vendor_name) = if let Some(ref pci) = pci_id {
             let vendor_id = pci.split(':').next().unwrap_or("");
@@ -161,13 +161,13 @@ fn extract_pci_id(line: &str) -> Option<String> {
         let abs_start = search_start + start;
         if let Some(end) = line[abs_start..].find(']') {
             let bracket_content = &line[abs_start + 1..abs_start + end];
-            
+
             // Check if it looks like a PCI ID (4 hex chars : 4 hex chars)
             if bracket_content.len() == 9 && bracket_content.chars().nth(4) == Some(':') {
                 // Verify it's all hex chars
                 let parts: Vec<&str> = bracket_content.split(':').collect();
-                if parts.len() == 2 
-                    && parts[0].len() == 4 
+                if parts.len() == 2
+                    && parts[0].len() == 4
                     && parts[1].len() == 4
                     && parts[0].chars().all(|c| c.is_ascii_hexdigit())
                     && parts[1].chars().all(|c| c.is_ascii_hexdigit())
@@ -191,7 +191,7 @@ mod tests {
     fn test_parse_nvidia_smi_output() {
         let output = "0, NVIDIA GeForce RTX 3090, GPU-12345678-1234-1234-1234-123456789012, 24576, 24000, 00000000:01:00.0, 535.129.03, 8.6";
         let devices = parse_nvidia_smi_output(output).unwrap();
-        
+
         assert_eq!(devices.len(), 1);
         assert_eq!(devices[0].name, "NVIDIA GeForce RTX 3090");
         assert_eq!(devices[0].memory_total_mb, 24576);
@@ -202,9 +202,9 @@ mod tests {
     fn test_parse_lspci_gpu_output() {
         let output = r#"01:00.0 VGA compatible controller [0300]: NVIDIA Corporation GA102 [GeForce RTX 3090] [10de:2204] (rev a1)
 00:02.0 VGA compatible controller [0300]: Intel Corporation Device [8086:9a49] (rev 01)"#;
-        
+
         let devices = parse_lspci_gpu_output(output).unwrap();
-        
+
         assert_eq!(devices.len(), 2);
         assert_eq!(devices[0].vendor, "NVIDIA");
         assert_eq!(devices[1].vendor, "Intel");
@@ -213,7 +213,10 @@ mod tests {
     #[test]
     fn test_extract_pci_id() {
         assert_eq!(extract_pci_id("[10de:2204]"), Some("10de:2204".to_string()));
-        assert_eq!(extract_pci_id("NVIDIA [10de:2204] (rev a1)"), Some("10de:2204".to_string()));
+        assert_eq!(
+            extract_pci_id("NVIDIA [10de:2204] (rev a1)"),
+            Some("10de:2204".to_string())
+        );
         assert_eq!(extract_pci_id("No PCI ID here"), None);
     }
 }

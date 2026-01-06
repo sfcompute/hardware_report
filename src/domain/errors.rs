@@ -142,18 +142,13 @@ pub enum SystemError {
     /// I/O operation failed (simple)
     IoError(String),
     /// I/O operation failed (with path context)
-    IoErrorWithPath {
-        path: String,
-        message: String,
-    },
+    IoErrorWithPath { path: String, message: String },
     /// Parsing error
     ParseError(String),
     /// Timeout
     Timeout(String),
     /// Resource not available
-    NotAvailable {
-        resource: String,
-    },
+    NotAvailable { resource: String },
 }
 
 impl fmt::Display for SystemError {
