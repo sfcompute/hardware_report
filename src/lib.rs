@@ -343,7 +343,7 @@ pub struct NetworkInterface {
     /// IP address.
     pub ip: String,
     /// IP prefix.
-    pub prefix: String,
+    pub prefix: Option<u32>,
     /// Interface speed.
     pub speed: Option<String>,
     /// Interface type.
@@ -2623,7 +2623,7 @@ impl ServerInfo {
                         name: name.clone(),
                         mac: data.get("mac").cloned().unwrap_or("Unknown".to_string()),
                         ip: data.get("ip").cloned().unwrap_or("Unknown".to_string()),
-                        prefix: data.get("prefix").cloned().unwrap_or("Unknown".to_string()),
+                        prefix: data.get("prefix").and_then(|p| p.parse::<u32>().ok()),
                         speed: Self::estimate_macos_interface_speed(&name, &interface_type),
                         type_: interface_type,
                         vendor: vendor.to_string(),
@@ -2689,8 +2689,7 @@ impl ServerInfo {
                         .unwrap_or("Unknown".to_string()),
                     prefix: ifconfig_info
                         .get("prefix")
-                        .cloned()
-                        .unwrap_or("Unknown".to_string()),
+                        .and_then(|p| p.parse::<u32>().ok()),
                     speed: Self::estimate_macos_interface_speed(name, &interface_type),
                     type_: interface_type,
                     vendor: vendor.to_string(),
@@ -2907,14 +2906,14 @@ impl ServerInfo {
 
                     let mac = iface["address"].as_str().unwrap_or("").to_string();
                     let mut ip = String::new();
-                    let mut prefix: String = String::new();
+                    let mut prefix: Option<u32> = None;
 
                     // Get IP address
                     if let Some(addr_info) = iface["addr_info"].as_array() {
                         for addr in addr_info {
                             if addr["family"].as_str() == Some("inet") {
                                 ip = addr["local"].as_str().unwrap_or("").to_string();
-                                prefix = addr["prefixlen"].as_str().unwrap_or("").to_string();
+                                prefix = addr["prefixlen"].as_u64().map(|p| p as u32);
                                 break;
                             }
                         }
