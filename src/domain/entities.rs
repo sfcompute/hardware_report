@@ -160,7 +160,7 @@ pub struct HardwareInfo {
 }
 
 /// CPU information
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, Default)]
 pub struct CpuInfo {
     /// CPU model name
     pub model: String,
@@ -211,31 +211,6 @@ pub struct CpuInfo {
     /// Detection methods used
     #[serde(default)]
     pub detection_methods: Vec<String>,
-}
-
-impl Default for CpuInfo {
-    fn default() -> Self {
-        Self {
-            model: String::new(),
-            cores: 0,
-            threads: 0,
-            sockets: 0,
-            speed: String::new(),
-            vendor: String::new(),
-            architecture: String::new(),
-            frequency_mhz: 0,
-            frequency_min_mhz: None,
-            frequency_max_mhz: None,
-            cache_l1d_kb: None,
-            cache_l1i_kb: None,
-            cache_l2_kb: None,
-            cache_l3_kb: None,
-            flags: Vec::new(),
-            microarchitecture: None,
-            caches: Vec::new(),
-            detection_methods: Vec::new(),
-        }
-    }
 }
 
 impl CpuInfo {
@@ -313,7 +288,7 @@ pub struct StorageInfo {
 }
 
 /// Storage type classification
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq, Default)]
 pub enum StorageType {
     /// NVMe SSD
     Nvme,
@@ -326,6 +301,7 @@ pub enum StorageType {
     /// Virtual device (should be filtered)
     Virtual,
     /// Unknown type
+    #[default]
     Unknown,
 }
 
@@ -355,12 +331,6 @@ impl StorageType {
             StorageType::Virtual => "Virtual",
             StorageType::Unknown => "Unknown",
         }
-    }
-}
-
-impl Default for StorageType {
-    fn default() -> Self {
-        StorageType::Unknown
     }
 }
 
@@ -457,7 +427,7 @@ pub struct GpuInfo {
 }
 
 /// GPU vendor classification
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq, Default)]
 pub enum GpuVendor {
     /// NVIDIA GPU
     Nvidia,
@@ -468,6 +438,7 @@ pub enum GpuVendor {
     /// Apple GPU (Apple Silicon)
     Apple,
     /// Unknown vendor
+    #[default]
     Unknown,
 }
 
@@ -491,12 +462,6 @@ impl GpuVendor {
             GpuVendor::Apple => "Apple",
             GpuVendor::Unknown => "Unknown",
         }
-    }
-}
-
-impl Default for GpuVendor {
-    fn default() -> Self {
-        GpuVendor::Unknown
     }
 }
 
@@ -584,7 +549,7 @@ pub struct NetworkInfo {
 }
 
 /// Network interface type classification
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq, Default)]
 pub enum NetworkInterfaceType {
     /// Physical Ethernet interface
     Ethernet,
@@ -607,13 +572,8 @@ pub enum NetworkInterfaceType {
     /// Macvlan interface
     Macvlan,
     /// Unknown type
+    #[default]
     Unknown,
-}
-
-impl Default for NetworkInterfaceType {
-    fn default() -> Self {
-        NetworkInterfaceType::Unknown
-    }
 }
 
 /// Network interface information

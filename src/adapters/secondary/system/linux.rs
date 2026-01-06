@@ -213,8 +213,8 @@ impl LinuxSystemInfoProvider {
         existing_firmware: Option<String>,
     ) -> (Option<String>, Option<String>) {
         // Extract controller name: "nvme0n1" -> "nvme0"
-        let controller = if device_name.starts_with("nvme") {
-            if let Some(pos) = device_name[4..].find('n') {
+        let controller = if let Some(stripped) = device_name.strip_prefix("nvme") {
+            if let Some(pos) = stripped.find('n') {
                 &device_name[..4 + pos]
             } else {
                 device_name
