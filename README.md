@@ -33,7 +33,7 @@ Get up and running in minutes:
 # 1. Clone and build
 git clone https://github.com/sfcompute/hardware_report.git
 cd hardware_report
-nix build
+cargo build
 
 # 2. Run hardware discovery
 sudo ./result/bin/hardware_report
@@ -75,7 +75,15 @@ nix develop
 cargo build --release
 ```
 
-### Option 3: Traditional Cargo Build
+### Option 3: Cargo Install
+
+```bash
+git clone https://github.com/sfcompute/hardware_report.git && cd hardware_report
+cargo install --path .
+sudo hardware_report
+```
+
+### Option 4: Traditional Cargo Build
 
 **Ubuntu/Debian:**
 ```bash
