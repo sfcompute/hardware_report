@@ -41,6 +41,8 @@ sudo ./result/bin/hardware_report
 
 Output: `<chassis_serial>_hardware_report.toml`
 
+**Pre-built .deb package:** Download from [GitHub Releases](https://github.com/sfcompute/hardware_report/releases)
+
 **Other installation methods:** See [docs/INSTALLATION.md](docs/INSTALLATION.md)
 
 ## Documentation
