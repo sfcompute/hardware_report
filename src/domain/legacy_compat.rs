@@ -258,6 +258,7 @@ impl From<crate::CpuInfo> for new::CpuInfo {
             threads: legacy.threads,
             sockets: legacy.sockets,
             speed: legacy.speed,
+            ..Default::default()
         }
     }
 }
@@ -342,9 +343,10 @@ impl From<crate::StorageDevice> for new::StorageDevice {
     fn from(legacy: crate::StorageDevice) -> Self {
         new::StorageDevice {
             name: legacy.name,
-            type_: legacy.type_,
+            type_: legacy.type_.clone(),
             size: legacy.size,
             model: legacy.model,
+            ..Default::default()
         }
     }
 }
@@ -386,6 +388,7 @@ impl From<crate::GpuDevice> for new::GpuDevice {
             pci_id: legacy.pci_id,
             vendor: legacy.vendor,
             numa_node: legacy.numa_node,
+            ..Default::default()
         }
     }
 }
@@ -435,6 +438,7 @@ impl From<crate::NetworkInterface> for new::NetworkInterface {
             model: legacy.model,
             pci_id: legacy.pci_id,
             numa_node: legacy.numa_node,
+            ..Default::default()
         }
     }
 }

@@ -26,6 +26,99 @@ lazy_static! {
     static ref CORE_COUNT_RE: Regex = Regex::new(r"(\d+)").unwrap();
 }
 
+/// Parse sysfs frequency file (kHz to MHz)
+///
+/// # Arguments
+///
+/// * `content` - Content of frequency file (value in kHz)
+///
+/// # Returns
+///
+/// Frequency in MHz.
+pub fn parse_sysfs_freq_khz(content: &str) -> Result<u32, String> {
+    let khz: u64 = content
+        .trim()
+        .parse()
+        .map_err(|e| format!("Failed to parse frequency: {}", e))?;
+    Ok((khz / 1000) as u32)
+}
+
+/// Parse sysfs cache size (e.g., "32K" -> 32)
+///
+/// # Arguments
+///
+/// * `content` - Content of cache size file (e.g., "32K", "256K", "16M")
+///
+/// # Returns
+///
+/// Size in KB.
+pub fn parse_sysfs_cache_size(content: &str) -> Result<u32, String> {
+    let trimmed = content.trim();
+    
+    if trimmed.ends_with('K') || trimmed.ends_with('k') {
+        let value: u32 = trimmed[..trimmed.len() - 1]
+            .parse()
+            .map_err(|e| format!("Failed to parse cache size: {}", e))?;
+        Ok(value)
+    } else if trimmed.ends_with('M') || trimmed.ends_with('m') {
+        let value: u32 = trimmed[..trimmed.len() - 1]
+            .parse()
+            .map_err(|e| format!("Failed to parse cache size: {}", e))?;
+        Ok(value * 1024)
+    } else {
+        // Assume bytes, convert to KB
+        let value: u32 = trimmed
+            .parse()
+            .map_err(|e| format!("Failed to parse cache size: {}", e))?;
+        Ok(value / 1024)
+    }
+}
+
+/// Parse /proc/cpuinfo
+///
+/// Extracts vendor, flags, and other CPU information.
+///
+/// # Arguments
+///
+/// * `content` - Content of /proc/cpuinfo
+pub fn parse_proc_cpuinfo(content: &str) -> Result<CpuInfo, String> {
+    let mut cpu_info = CpuInfo::default();
+    
+    for line in content.lines() {
+        if let Some((key, value)) = line.split_once(':') {
+            let key = key.trim();
+            let value = value.trim();
+            
+            match key {
+                "vendor_id" => cpu_info.vendor = value.to_string(),
+                "model name" => {
+                    if cpu_info.model.is_empty() {
+                        cpu_info.model = value.to_string();
+                    }
+                }
+                "flags" | "Features" => {
+                    cpu_info.flags = value.split_whitespace().map(|s| s.to_string()).collect();
+                }
+                "CPU implementer" => {
+                    // ARM CPU implementer code
+                    if cpu_info.vendor.is_empty() {
+                        cpu_info.vendor = match value {
+                            "0x41" => "ARM".to_string(),
+                            "0x4e" => "NVIDIA".to_string(),
+                            "0x51" => "Qualcomm".to_string(),
+                            "0x61" => "Apple".to_string(),
+                            _ => value.to_string(),
+                        };
+                    }
+                }
+                _ => {}
+            }
+        }
+    }
+    
+    Ok(cpu_info)
+}
+
 /// Parse CPU information from Linux lscpu output
 ///
 /// # Arguments
@@ -83,6 +176,7 @@ pub fn parse_lscpu_output(lscpu_output: &str) -> Result<CpuInfo, String> {
         threads,
         sockets,
         speed,
+        ..Default::default()
     })
 }
 
@@ -116,6 +210,7 @@ pub fn parse_dmidecode_cpu(dmidecode_output: &str) -> Result<CpuInfo, String> {
         threads,
         sockets: 1, // dmidecode typically shows per-socket info
         speed: clean_value(&speed),
+        ..Default::default()
     })
 }
 
@@ -175,6 +270,7 @@ pub fn parse_macos_cpu_info(system_profiler_output: &str) -> Result<CpuInfo, Str
         threads: 1, // Apple Silicon doesn't expose thread count the same way
         sockets: 1, // Apple Silicon is single socket
         speed: clean_value(&speed),
+        ..Default::default()
     })
 }
 
@@ -213,6 +309,7 @@ pub fn combine_cpu_info(primary: CpuInfo, secondary: CpuInfo) -> CpuInfo {
         } else {
             secondary.speed
         },
+        ..Default::default()
     }
 }
 
@@ -328,6 +425,7 @@ CPU MHz:                         2300.000"#;
             threads: 2,
             sockets: 1,
             speed: "Unknown".to_string(),
+            ..Default::default()
         };
 
         let secondary = CpuInfo {
@@ -336,6 +434,7 @@ CPU MHz:                         2300.000"#;
             threads: 0,
             sockets: 0,
             speed: "2.3 GHz".to_string(),
+            ..Default::default()
         };
 
         let combined = combine_cpu_info(primary, secondary);
@@ -352,6 +451,7 @@ CPU MHz:                         2300.000"#;
             threads: 2,
             sockets: 1,
             speed: "2.3 GHz".to_string(),
+            ..Default::default()
         };
 
         let topology = create_cpu_topology(&cpu_info, Some(1));

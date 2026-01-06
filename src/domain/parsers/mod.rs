@@ -21,6 +21,7 @@ limitations under the License.
 
 pub mod common;
 pub mod cpu;
+pub mod gpu;
 pub mod memory;
 pub mod network;
 pub mod storage;
@@ -28,6 +29,7 @@ pub mod system;
 
 pub use common::*;
 pub use cpu::*;
+pub use gpu::*;
 pub use memory::*;
 pub use network::*;
 pub use storage::*;

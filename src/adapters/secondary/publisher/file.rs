@@ -221,6 +221,7 @@ mod tests {
                     threads: 2,
                     sockets: 1,
                     speed: "3.0 GHz".to_string(),
+                    ..Default::default()
                 },
                 memory: crate::domain::MemoryInfo {
                     total: "16GB".to_string(),

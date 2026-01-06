@@ -159,6 +159,122 @@ pub struct HardwareInfo {
     pub gpus: GpuInfo,
 }
 
+/// CPU information
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct CpuInfo {
+    /// CPU model name
+    pub model: String,
+    /// Number of cores per socket
+    pub cores: u32,
+    /// Number of threads per core
+    pub threads: u32,
+    /// Number of sockets
+    pub sockets: u32,
+    /// CPU speed as string
+    pub speed: String,
+    /// CPU vendor (e.g., "GenuineIntel", "AuthenticAMD")
+    #[serde(default)]
+    pub vendor: String,
+    /// CPU architecture
+    #[serde(default)]
+    pub architecture: String,
+    /// CPU frequency in MHz
+    #[serde(default)]
+    pub frequency_mhz: u32,
+    /// Minimum frequency in MHz
+    #[serde(default)]
+    pub frequency_min_mhz: Option<u32>,
+    /// Maximum frequency in MHz  
+    #[serde(default)]
+    pub frequency_max_mhz: Option<u32>,
+    /// L1 data cache size in KB
+    #[serde(default)]
+    pub cache_l1d_kb: Option<u32>,
+    /// L1 instruction cache size in KB
+    #[serde(default)]
+    pub cache_l1i_kb: Option<u32>,
+    /// L2 cache size in KB
+    #[serde(default)]
+    pub cache_l2_kb: Option<u32>,
+    /// L3 cache size in KB
+    #[serde(default)]
+    pub cache_l3_kb: Option<u32>,
+    /// CPU flags/features
+    #[serde(default)]
+    pub flags: Vec<String>,
+    /// Microarchitecture (e.g., "Zen 3", "Ice Lake")
+    #[serde(default)]
+    pub microarchitecture: Option<String>,
+    /// Detailed cache information
+    #[serde(default)]
+    pub caches: Vec<CpuCacheInfo>,
+    /// Detection methods used
+    #[serde(default)]
+    pub detection_methods: Vec<String>,
+}
+
+impl Default for CpuInfo {
+    fn default() -> Self {
+        Self {
+            model: String::new(),
+            cores: 0,
+            threads: 0,
+            sockets: 0,
+            speed: String::new(),
+            vendor: String::new(),
+            architecture: String::new(),
+            frequency_mhz: 0,
+            frequency_min_mhz: None,
+            frequency_max_mhz: None,
+            cache_l1d_kb: None,
+            cache_l1i_kb: None,
+            cache_l2_kb: None,
+            cache_l3_kb: None,
+            flags: Vec::new(),
+            microarchitecture: None,
+            caches: Vec::new(),
+            detection_methods: Vec::new(),
+        }
+    }
+}
+
+impl CpuInfo {
+    /// Set speed string from frequency_mhz
+    pub fn set_speed_string(&mut self) {
+        if self.frequency_mhz > 0 {
+            if self.frequency_mhz >= 1000 {
+                self.speed = format!("{:.2} GHz", self.frequency_mhz as f64 / 1000.0);
+            } else {
+                self.speed = format!("{} MHz", self.frequency_mhz);
+            }
+        }
+    }
+
+    /// Calculate total cores and threads
+    pub fn calculate_totals(&mut self) {
+        // These are typically already set correctly from parsing
+    }
+}
+
+/// CPU cache information
+#[derive(Debug, Serialize, Deserialize, Clone, Default)]
+pub struct CpuCacheInfo {
+    /// Cache level (1, 2, 3, etc.)
+    pub level: u8,
+    /// Cache type ("Data", "Instruction", "Unified")
+    pub cache_type: String,
+    /// Size in KB
+    pub size_kb: u32,
+    /// Ways of associativity
+    pub ways_of_associativity: Option<u32>,
+    /// Cache line size in bytes
+    pub line_size_bytes: Option<u32>,
+    /// Number of sets
+    pub sets: Option<u32>,
+    /// Whether this cache is shared between cores
+    pub shared: Option<bool>,
+}
+
 /// Memory information
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct MemoryInfo {
@@ -187,9 +303,6 @@ pub struct MemoryModule {
     pub manufacturer: String,
     /// Serial number
     pub serial: String,
-    pub part_number: Option<String>,
-    pub rank: Option<u32>,
-    pub configured_voltage: Option<u32>,
 }
 
 /// Storage information
@@ -199,55 +312,141 @@ pub struct StorageInfo {
     pub devices: Vec<StorageDevice>,
 }
 
-/// GPU device information
-///
-/// Represents a discrete or integrated GPU detected in the system.
-/// Memory values are provided in megabytes as unsigned integers for
-/// reliable parsing by CMDB consumers.
-///
-/// # Detection Methods
-///
-/// GPUs are detected using multiple methods in priority order:
-/// 1. NVML (NVIDIA Management Library) - most accurate for NVIDIA GPUs
-/// 2. nvidia-smi command - fallback for NVIDIA when NVML unavailable
-/// 3. ROCm SMI - AMD GPU detection
-/// 4. sysfs /sys/class/drm - Linux DRM subsystem
-/// 5. lspci - PCI device enumeration
-/// 6. sysinfo crate - cross-platform fallback
-///
-/// # References
-///
-/// - [NVIDIA NVML Documentation](https://developer.nvidia.com/nvidia-management-library-nvml)
-/// - [Linux DRM Subsystem](https://www.kernel.org/doc/html/latest/gpu/drm-uapi.html)
-/// - [PCI ID Database](https://pci-ids.ucw.cz/)
-#[derive(Debug, Clone, Deserialize, Serialize)]
-pub struct GpuDevice {
-    /// GPU index (0-based)
-    pub index: u32,
+/// Storage type classification
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
+pub enum StorageType {
+    /// NVMe SSD
+    Nvme,
+    /// SATA SSD
+    Ssd,
+    /// Hard Disk Drive
+    Hdd,
+    /// eMMC storage (common on ARM)
+    Emmc,
+    /// Virtual device (should be filtered)
+    Virtual,
+    /// Unknown type
+    Unknown,
+}
 
-    /// GPU product name
+impl StorageType {
+    /// Determine storage type from device name and rotational flag
+    pub fn from_device(name: &str, is_rotational: bool) -> Self {
+        if name.starts_with("nvme") {
+            StorageType::Nvme
+        } else if name.starts_with("mmcblk") {
+            StorageType::Emmc
+        } else if name.starts_with("loop") || name.starts_with("ram") || name.starts_with("dm-") {
+            StorageType::Virtual
+        } else if is_rotational {
+            StorageType::Hdd
+        } else {
+            StorageType::Ssd
+        }
+    }
+
+    /// Get display name for the storage type
+    pub fn display_name(&self) -> &'static str {
+        match self {
+            StorageType::Nvme => "NVMe SSD",
+            StorageType::Ssd => "SSD",
+            StorageType::Hdd => "HDD",
+            StorageType::Emmc => "eMMC",
+            StorageType::Virtual => "Virtual",
+            StorageType::Unknown => "Unknown",
+        }
+    }
+}
+
+impl Default for StorageType {
+    fn default() -> Self {
+        StorageType::Unknown
+    }
+}
+
+/// Storage device information
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct StorageDevice {
+    /// Device name (e.g., "sda", "nvme0n1")
     pub name: String,
-
-    /// GPU UUUD
-    pub uuid: String,
-
-    /// Vendor name
-    pub vendor: String,
-
-    /// Driver Version
-    pub driver_version: Option<String>,
-
-    /// CUDA compute capability for Nvidia gpus
-    pub compute_capability: Option<String>,
-
-    /// GPU architecturr (Hopper, Ada LoveLace)
-    pub architecture: Option<String>,
-
-    /// NUMA node affiniity (-1 if not applicable)
-    pub numa_node: Option<i32>,
-
-    /// Detection method used to dsicover this GPU
+    /// Device path (e.g., "/dev/sda")
+    #[serde(default)]
+    pub device_path: String,
+    /// Device type enum
+    #[serde(default)]
+    pub device_type: StorageType,
+    /// Device type as string (for backward compatibility)
+    pub type_: String,
+    /// Device size as human-readable string
+    pub size: String,
+    /// Device size in bytes
+    #[serde(default)]
+    pub size_bytes: u64,
+    /// Device size in GB
+    #[serde(default)]
+    pub size_gb: f64,
+    /// Device model
+    pub model: String,
+    /// Serial number
+    #[serde(default)]
+    pub serial_number: Option<String>,
+    /// Firmware version
+    #[serde(default)]
+    pub firmware_version: Option<String>,
+    /// World Wide Name
+    #[serde(default)]
+    pub wwn: Option<String>,
+    /// Interface type (e.g., "NVMe", "SATA", "SAS")
+    #[serde(default)]
+    pub interface: String,
+    /// Whether this is a rotational device (HDD)
+    #[serde(default)]
+    pub is_rotational: bool,
+    /// Detection method used
+    #[serde(default)]
     pub detection_method: String,
+}
+
+impl Default for StorageDevice {
+    fn default() -> Self {
+        Self {
+            name: String::new(),
+            device_path: String::new(),
+            device_type: StorageType::Unknown,
+            type_: String::new(),
+            size: String::new(),
+            size_bytes: 0,
+            size_gb: 0.0,
+            model: String::new(),
+            serial_number: None,
+            firmware_version: None,
+            wwn: None,
+            interface: String::new(),
+            is_rotational: false,
+            detection_method: String::new(),
+        }
+    }
+}
+
+impl StorageDevice {
+    /// Calculate size_gb and size string from size_bytes
+    pub fn calculate_size_fields(&mut self) {
+        if self.size_bytes > 0 {
+            self.size_gb = self.size_bytes as f64 / (1024.0 * 1024.0 * 1024.0);
+            if self.size_gb >= 1000.0 {
+                self.size = format!("{:.2} TB", self.size_gb / 1024.0);
+            } else {
+                self.size = format!("{:.2} GB", self.size_gb);
+            }
+        }
+    }
+
+    /// Set device path from name if not already set
+    pub fn set_device_path(&mut self) {
+        if self.device_path.is_empty() && !self.name.is_empty() {
+            self.device_path = format!("/dev/{}", self.name);
+        }
+    }
 }
 
 /// GPU information
@@ -256,6 +455,125 @@ pub struct GpuInfo {
     /// List of GPU devices
     pub devices: Vec<GpuDevice>,
 }
+
+/// GPU vendor classification
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
+pub enum GpuVendor {
+    /// NVIDIA GPU
+    Nvidia,
+    /// AMD GPU
+    Amd,
+    /// Intel GPU
+    Intel,
+    /// Apple GPU (Apple Silicon)
+    Apple,
+    /// Unknown vendor
+    Unknown,
+}
+
+impl GpuVendor {
+    /// Determine vendor from PCI vendor ID
+    pub fn from_pci_vendor(vendor_id: &str) -> Self {
+        match vendor_id.to_lowercase().as_str() {
+            "10de" => GpuVendor::Nvidia,
+            "1002" => GpuVendor::Amd,
+            "8086" => GpuVendor::Intel,
+            _ => GpuVendor::Unknown,
+        }
+    }
+
+    /// Get vendor name string
+    pub fn name(&self) -> &'static str {
+        match self {
+            GpuVendor::Nvidia => "NVIDIA",
+            GpuVendor::Amd => "AMD",
+            GpuVendor::Intel => "Intel",
+            GpuVendor::Apple => "Apple",
+            GpuVendor::Unknown => "Unknown",
+        }
+    }
+}
+
+impl Default for GpuVendor {
+    fn default() -> Self {
+        GpuVendor::Unknown
+    }
+}
+
+/// GPU device information
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct GpuDevice {
+    /// GPU index
+    pub index: u32,
+    /// GPU name
+    pub name: String,
+    /// GPU UUID
+    pub uuid: String,
+    /// Total GPU memory as string (for backward compatibility)
+    pub memory: String,
+    /// Total GPU memory in MB
+    #[serde(default)]
+    pub memory_total_mb: u64,
+    /// Free GPU memory in MB
+    #[serde(default)]
+    pub memory_free_mb: Option<u64>,
+    /// PCI ID (vendor:device) or Apple Fabric for Apple Silicon
+    pub pci_id: String,
+    /// PCI bus ID (e.g., "0000:01:00.0")
+    #[serde(default)]
+    pub pci_bus_id: Option<String>,
+    /// Vendor name (for backward compatibility)
+    pub vendor: String,
+    /// Vendor classification enum
+    #[serde(default)]
+    pub vendor_enum: GpuVendor,
+    /// NUMA node
+    pub numa_node: Option<i32>,
+    /// Driver version
+    #[serde(default)]
+    pub driver_version: Option<String>,
+    /// Compute capability (NVIDIA specific)
+    #[serde(default)]
+    pub compute_capability: Option<String>,
+    /// Detection method used
+    #[serde(default)]
+    pub detection_method: String,
+}
+
+impl Default for GpuDevice {
+    fn default() -> Self {
+        Self {
+            index: 0,
+            name: String::new(),
+            uuid: String::new(),
+            memory: String::new(),
+            memory_total_mb: 0,
+            memory_free_mb: None,
+            pci_id: String::new(),
+            pci_bus_id: None,
+            vendor: String::new(),
+            vendor_enum: GpuVendor::Unknown,
+            numa_node: None,
+            driver_version: None,
+            compute_capability: None,
+            detection_method: String::new(),
+        }
+    }
+}
+
+impl GpuDevice {
+    /// Set memory string from memory_total_mb
+    pub fn set_memory_string(&mut self) {
+        if self.memory_total_mb > 0 {
+            if self.memory_total_mb >= 1024 {
+                self.memory = format!("{:.1} GB", self.memory_total_mb as f64 / 1024.0);
+            } else {
+                self.memory = format!("{} MB", self.memory_total_mb);
+            }
+        }
+    }
+}
+
 /// Network information
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct NetworkInfo {
@@ -265,28 +583,37 @@ pub struct NetworkInfo {
     pub infiniband: Option<InfinibandInfo>,
 }
 
-/// Storage device type classification
-///
-/// # References
-///
-/// - [Linux Block Device Documentation](https://www.kernel.org/doc/html/latest/block/index.html)
-/// - [NVMe Specification](https://nvmexpress.org/specifications/)
-#[derive(Debug, Serialize, Deserialize, Clone)]
-pub enum StorageType {
-    /// NVMe ssd
-    Nvme,
-
-    /// SATA/SAS ssd
-    Ssd,
-
-    /// Hard disk (rotational)
-    Hdd,
-
-    /// Embedded MMC Storage
-    Emmc,
-
-    /// Unknown or unclassified storage type
+/// Network interface type classification
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
+pub enum NetworkInterfaceType {
+    /// Physical Ethernet interface
+    Ethernet,
+    /// Wireless interface
+    Wireless,
+    /// Loopback interface
+    Loopback,
+    /// Bridge interface
+    Bridge,
+    /// VLAN interface
+    Vlan,
+    /// Bond/LAG interface
+    Bond,
+    /// Virtual Ethernet (veth pair)
+    Veth,
+    /// TUN/TAP interface
+    TunTap,
+    /// InfiniBand interface
+    Infiniband,
+    /// Macvlan interface
+    Macvlan,
+    /// Unknown type
     Unknown,
+}
+
+impl Default for NetworkInterfaceType {
+    fn default() -> Self {
+        NetworkInterfaceType::Unknown
+    }
 }
 
 /// Network interface information
@@ -300,10 +627,16 @@ pub struct NetworkInterface {
     pub ip: String,
     /// IP prefix
     pub prefix: String,
-    /// Interface speed
+    /// Interface speed as string (e.g., "1000 Mbps")
     pub speed: Option<String>,
-    /// Interface type
+    /// Interface speed in Mbps (numeric)
+    #[serde(default)]
+    pub speed_mbps: Option<u32>,
+    /// Interface type as string (for backward compatibility)
     pub type_: String,
+    /// Interface type classification
+    #[serde(default)]
+    pub interface_type: NetworkInterfaceType,
     /// Vendor
     pub vendor: String,
     /// Model
@@ -312,122 +645,53 @@ pub struct NetworkInterface {
     pub pci_id: String,
     /// NUMA node
     pub numa_node: Option<i32>,
-    pub driver: Option<String>,           
-    pub driver_version: Option<String>,   
-    pub firmware_version: Option<String>, 
-    pub mtu: u32,                         
-    pub is_up: bool,                      
-    pub is_virtual: bool,                 
+    /// Kernel driver in use
+    #[serde(default)]
+    pub driver: Option<String>,
+    /// Driver version
+    #[serde(default)]
+    pub driver_version: Option<String>,
+    /// Maximum Transmission Unit in bytes
+    #[serde(default = "default_mtu")]
+    pub mtu: u32,
+    /// Whether the interface is operationally up
+    #[serde(default)]
+    pub is_up: bool,
+    /// Whether this is a virtual interface
+    #[serde(default)]
+    pub is_virtual: bool,
+    /// Link detected (carrier present)
+    #[serde(default)]
+    pub carrier: Option<bool>,
 }
 
-/// Storage device information
-///
-/// # Detection Methods
-///
-/// Storage devices are detected using multiple methods in priority order:
-/// 1. sysfs /sys/block - direct kernel interface (Linux)
-/// 2. lsblk command - block device listing
-/// 3. sysinfo crate - cross-platform fallback
-/// 4. diskutil (macOS)
-///
-/// # References
-///
-/// - [Linux sysfs Block Devices](https://www.kernel.org/doc/Documentation/ABI/testing/sysfs-block)
-/// - [SMART Attributes](https://en.wikipedia.org/wiki/S.M.A.R.T.)
-#[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct StorageDevice {
-    /// Device name (nvme0n1, sda etc..,)
-    pub name: String,
-
-    /// Device type classification
-    pub device_type: StorageType,
-
-    /// Legacy type field
-    #[deprecated(since = "0.2.0", note = "Use device_type instead")]
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub type_: Option<String>,
-
-    /// Device size in bytes
-    pub size_bytes: u64,
-
-    /// Device size in gigabyes
-    pub size_gb: f64,
-
-    /// Legacy size field as string (deprecated)
-    #[deprecated(since = "0.2.0", note = "Use size_bytes or size_gb instead")]
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub size: Option<String>,
-
-    /// Device model name
-    pub model: String,
-
-    /// Device serial number (may require elevated privileges)
-    pub serial_number: Option<String>,
-
-    /// Device firmware version
-    pub firmware_version: Option<String>,
-
-    /// Interface type (e.g., "NVMe", "SATA", "SAS", "eMMC")
-    pub interface: String,
-
-    /// Whether the device is rotational (true = HDD, false = SSD/NVMe)
-    pub is_rotational: bool,
-
-    /// WWN (World Wide Name) if available
-    pub wwn: Option<String>,
-
-    /// Detection method used
-    pub detection_method: String,
+fn default_mtu() -> u32 {
+    1500
 }
 
-/// # Detection Methods
-///
-/// CPU information is gathered from multiple sources:
-/// 1. sysfs /sys/devices/system/cpu - frequency and cache (Linux)
-/// 2. /proc/cpuinfo - model and features (Linux)
-/// 3. raw-cpuid crate - x86 CPUID instruction
-/// 4. lscpu command - topology information
-/// 5. dmidecode - SMBIOS data (requires privileges)
-/// 6. sysinfo crate - cross-platform fallback
-///
-/// # References
-///
-/// - [Linux CPU sysfs Interface](https://www.kernel.org/doc/Documentation/cpu-freq/user-guide.rst)
-/// - [Intel CPUID Reference](https://www.intel.com/content/www/us/en/developer/articles/technical/intel-sdm.html)
-/// - [ARM CPU Identification](https://developer.arm.com/documentation/ddi0487/latest)
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct CpuInfo {
-    /// Cpu Model (AMD, Intel)
-    pub model: String,
-
-    /// CPu Vendor
-    pub vendor: String,
-
-    /// Number of phyiscal cores per socket
-    pub cores: u32,
-
-    /// Number of threads per core
-    pub threads: u32,
-
-    /// Number of CPU sockets
-    pub sockets: u32,
-
-    /// CPU frequencies in MHz (uccrent or max)
-    pub frequency_mhz: u32,
-
-    /// Legacy speed field as string (deprecated)
-    #[deprecated(since = "0.2.0", note = "Use frequency_mhz instead")]
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub speed: Option<String>,
-
-    /// CPU architecture
-    pub arhitecture: String,
-
-    /// LI data cache size in kilobytes (per core)
-    pub cache_l1d_kb: Option<u32>,
-
-    /// L1 instruction cache size in kilobytes (per core)
-    pub cache_l1li_kb: Option<u32>,
+impl Default for NetworkInterface {
+    fn default() -> Self {
+        Self {
+            name: String::new(),
+            mac: String::new(),
+            ip: String::new(),
+            prefix: String::new(),
+            speed: None,
+            speed_mbps: None,
+            type_: String::new(),
+            interface_type: NetworkInterfaceType::Unknown,
+            vendor: String::new(),
+            model: String::new(),
+            pci_id: String::new(),
+            numa_node: None,
+            driver: None,
+            driver_version: None,
+            mtu: 1500,
+            is_up: false,
+            is_virtual: false,
+            carrier: None,
+        }
+    }
 }
 
 /// Infiniband information
