@@ -2,9 +2,11 @@
 
 # Hardware Report
 
-**Automated infrastructure discovery tool for Linux servers built with hexagonal architecture.**
+**Automated infrastructure discovery tool built with hexagonal architecture.**
 
 Generates structured hardware inventory reports in TOML/JSON format. Designed for CMDB population, infrastructure auditing, and bare-metal server management at scale.
+
+**Platforms:** Linux, macOS | **Architectures:** x86_64, ARM64 | **GPUs:** NVIDIA (including Blackwell)
 
 ## Table of Contents
 
