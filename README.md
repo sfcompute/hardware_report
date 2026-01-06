@@ -54,6 +54,7 @@ Output: `<chassis_serial>_hardware_report.toml`
 | [docs/INSTALLATION.md](docs/INSTALLATION.md) | All installation methods (Nix, Cargo, pre-built releases) |
 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | Hexagonal architecture overview |
 | [docs/API.md](docs/API.md) | Library API reference |
+| [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) | Production deployment guide |
 
 ## Contributing
 
