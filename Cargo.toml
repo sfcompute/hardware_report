@@ -8,26 +8,26 @@ description = "A tool for generating hardware information reports"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-lazy_static = "1.4"
+lazy_static = "1.5"
 tonic = "0.10"
 reqwest = { version = "0.11", default-features = false, features = [
     "json",
     "rustls-tls",
 ] }
 structopt = "0.3"
-sysinfo = "0.32.0" # For system information gathering
+sysinfo = "0.32.1" # For system information gathering
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0" # For JSON output
-clap = { version = "4.4", features = [
+clap = { version = "4.5", features = [
     "derive",
 ] } # For command line argument parsing
 thiserror = "1.0" # For error handling
 log = "0.4" # For logging
-env_logger = "0.11.5" # For logging implementation
-regex = "1.11.1"
-toml = "0.8.19"
-libc = "0.2.161"
-tokio = { version = "1.0", features = ["full"] }
+env_logger = "0.11.8" # For logging implementation
+regex = "1.12.2"
+toml = "0.8.23"
+libc = "0.2.179"
+tokio = { version = "1.49", features = ["full"] }
 async-trait = "0.1"
 # Requires Nvidia driver at runtime
 nvml-wrapper = { version = "0.11.0", optional = true }
@@ -43,9 +43,9 @@ x86-cpu = ["raw-cpuid"]
 full = ["nvidia", "x86-cpu"]
 
 [dev-dependencies]
-tempfile = "3.8"   # For temporary file handling in tests
-assert_fs = "1.0"  # For filesystem assertions in tests
-predicates = "3.0" # For test assertions
+tempfile = "3.24"   # For temporary file handling in tests
+assert_fs = "1.1"  # For filesystem assertions in tests
+predicates = "3.1" # For test assertions
 
 [profile.release]
 opt-level = 3     # Maximum optimization
