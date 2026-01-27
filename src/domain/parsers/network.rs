@@ -18,26 +18,96 @@ limitations under the License.
 
 use crate::domain::NetworkInterface;
 
-/// Parse network interfaces from ip command output
+/// Parse network interfaces from `ip addr show` command output
 pub fn parse_ip_output(ip_output: &str) -> Result<Vec<NetworkInterface>, String> {
     let mut interfaces = Vec::new();
+    let mut current_interface: Option<NetworkInterface> = None;
 
-    // Simplified parsing - real implementation would be more comprehensive
     for line in ip_output.lines() {
-        if line.contains("eth") || line.contains("ens") {
-            interfaces.push(NetworkInterface {
-                name: "eth0".to_string(),
-                mac: "00:00:00:00:00:00".to_string(),
-                ip: "192.168.1.100".to_string(),
-                prefix: "24".to_string(),
-                speed: Some("1000 Mbps".to_string()),
-                type_: "Ethernet".to_string(),
-                vendor: "Unknown".to_string(),
-                model: "Unknown".to_string(),
-                pci_id: "Unknown".to_string(),
-                numa_node: None,
-                ..Default::default()
-            });
+        let trimmed = line.trim();
+
+        // Interface line starts with a number followed by colon
+        // Example: "2: eth0: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 ..."
+        if !line.starts_with(' ') && line.contains(": ") {
+            // Save previous interface if it exists (and has a name)
+            if let Some(interface) = current_interface.take() {
+                // Skip loopback
+                if interface.name != "lo" {
+                    interfaces.push(interface);
+                }
+            }
+
+            // Extract interface name: "2: eth0:" -> "eth0"
+            let parts: Vec<&str> = line.splitn(3, ':').collect();
+            if parts.len() >= 2 {
+                let name = parts[1].trim().to_string();
+                // Skip loopback interface
+                if name == "lo" {
+                    continue;
+                }
+
+                // Determine interface type based on name
+                let interface_type = if name.starts_with("tailscale") {
+                    "tailscale".to_string()
+                } else if name.starts_with("wl") {
+                    "wireless".to_string()
+                } else if name.starts_with("docker") || name.starts_with("br-") {
+                    "bridge".to_string()
+                } else if name.starts_with("veth") {
+                    "veth".to_string()
+                } else {
+                    "ethernet".to_string()
+                };
+
+                current_interface = Some(NetworkInterface {
+                    name,
+                    mac: String::new(),
+                    ip: String::new(),
+                    prefix: String::new(),
+                    speed: None,
+                    type_: interface_type,
+                    vendor: "Unknown".to_string(),
+                    model: "Unknown".to_string(),
+                    pci_id: "Unknown".to_string(),
+                    numa_node: None,
+                    ..Default::default()
+                });
+            }
+        } else if let Some(ref mut interface) = current_interface {
+            // Parse interface details (indented lines)
+
+            // MAC address line: "    link/ether 00:11:22:33:44:55 brd ff:ff:ff:ff:ff:ff"
+            if trimmed.starts_with("link/ether ") {
+                if let Some(mac) = trimmed.split_whitespace().nth(1) {
+                    interface.mac = mac.to_string();
+                }
+            }
+            // Point-to-point interfaces (like Tailscale) have "link/none"
+            else if trimmed.starts_with("link/none") {
+                interface.mac = "00:00:00:00:00:00".to_string();
+            }
+            // IPv4 address line: "    inet 192.168.1.100/24 ..."
+            else if trimmed.starts_with("inet ") {
+                if let Some(addr_with_prefix) = trimmed.split_whitespace().nth(1) {
+                    let parts: Vec<&str> = addr_with_prefix.split('/').collect();
+                    if !parts.is_empty() {
+                        // Only set IP if not already set (first IPv4 address wins)
+                        if interface.ip.is_empty() {
+                            interface.ip = parts[0].to_string();
+                            if parts.len() > 1 {
+                                interface.prefix = parts[1].to_string();
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // Don't forget the last interface
+    if let Some(interface) = current_interface {
+        if interface.name != "lo" {
+            interfaces.push(interface);
         }
     }
 
