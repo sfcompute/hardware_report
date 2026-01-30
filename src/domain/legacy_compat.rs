@@ -431,7 +431,9 @@ impl From<crate::NetworkInterface> for new::NetworkInterface {
             name: legacy.name,
             mac: legacy.mac,
             ip: legacy.ip,
-            prefix: legacy.prefix,
+            prefix: legacy
+                .prefix
+                .map_or("Unknown".to_string(), |p| p.to_string()),
             speed: legacy.speed,
             type_: legacy.type_,
             vendor: legacy.vendor,
@@ -449,7 +451,7 @@ impl From<new::NetworkInterface> for crate::NetworkInterface {
             name: new_iface.name,
             mac: new_iface.mac,
             ip: new_iface.ip,
-            prefix: new_iface.prefix,
+            prefix: new_iface.prefix.parse::<u32>().ok(),
             speed: new_iface.speed,
             type_: new_iface.type_,
             vendor: new_iface.vendor,
