@@ -34,21 +34,15 @@ cargo build --release
 
 Download from [GitHub Releases](https://github.com/sfcompute/hardware_report/releases):
 
-**Debian/Ubuntu package:**
+**Linux tarball** (pick the archive for your architecture — `x86_64` or `aarch64`):
 ```bash
 curl -sL https://api.github.com/repos/sfcompute/hardware_report/releases/latest \
-  | grep "browser_download_url.*\.deb" | cut -d '"' -f 4 | wget -qi -
-sudo apt install -y ./hardware-report_*_amd64.deb
-sudo hardware_report
-```
-
-**Standalone binary:**
-```bash
-curl -sL https://api.github.com/repos/sfcompute/hardware_report/releases/latest \
-  | grep "browser_download_url.*tar.gz" | cut -d '"' -f 4 | wget -qi -
+  | grep "browser_download_url.*hardware_report-linux-x86_64.*\.tar\.gz" | cut -d '"' -f 4 | wget -qi -
 tar xzf hardware_report-linux-x86_64-*.tar.gz
 sudo ./hardware_report-linux-x86_64
 ```
+
+On ARM64, use `hardware_report-linux-aarch64` in the `grep` pattern and tarball / binary names instead.
 
 ## Cargo Install
 

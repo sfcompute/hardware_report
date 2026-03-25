@@ -1,50 +1,56 @@
 name: Release Build
 
+# Runs when a GitHub Release is published (you create the release for an existing tag, or
+# create tag + release together in the UI). Assets are built and attached to that release.
+# Optional: workflow_dispatch with a tag for manual builds (creates/updates release assets).
 on:
-  push:
-    tags:
-      - "v*.*.*"
+  release:
+    types: [published]
   workflow_dispatch:
+    inputs:
+      tag:
+        description: "Existing git tag to build (e.g. v1.0.0)"
+        required: true
+        type: string
 
 permissions:
   contents: write
   packages: write
-  issues: write
-  pull-requests: write
 
 env:
   CARGO_TERM_COLOR: always
   RUST_BACKTRACE: 1
 
 jobs:
-  create-release:
+  metadata:
     runs-on: ubuntu-latest
     outputs:
-      upload_url: ${{ steps.create_release.outputs.upload_url }}
-      version: ${{ steps.version.outputs.version }}
+      tag: ${{ steps.meta.outputs.tag }}
+      version: ${{ steps.meta.outputs.version }}
     steps:
-      - name: Get version from tag
-        id: version
-        run: echo "version=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
-
-      - name: Create Release
-        id: create_release
-        uses: actions/create-release@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          tag_name: ${{ github.ref_name }}
-          release_name: Release ${{ github.ref_name }}
-          draft: false
-          prerelease: false
+      - id: meta
+        run: |
+          if [ "${{ github.event_name }}" = "release" ]; then
+            TAG="${{ github.event.release.tag_name }}"
+          else
+            TAG="${{ github.event.inputs.tag }}"
+          fi
+          if [[ ! "$TAG" =~ ^v ]]; then
+            echo "::error::Tag must start with v (got: $TAG)"
+            exit 1
+          fi
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "version=${TAG#v}" >> "$GITHUB_OUTPUT"
 
   build-linux:
-    needs: create-release
-    runs-on: ubuntu-latest
+    needs: metadata
+    runs-on: blacksmith-2vcpu-ubuntu-2204
     container:
       image: ubuntu:latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.metadata.outputs.tag }}
 
       - name: Install build dependencies
         run: |
@@ -71,44 +77,31 @@ jobs:
         run: |
           cargo build --release --target x86_64-unknown-linux-gnu
           mkdir -p build/release
-
-          # Copy the binary
           cp target/x86_64-unknown-linux-gnu/release/hardware_report build/release/hardware_report-linux-x86_64
-
-          # Strip the binary to reduce size
           strip build/release/hardware_report-linux-x86_64
 
       - name: Create tarball
         run: |
+          VERSION="${{ needs.metadata.outputs.version }}"
           cd build/release
-          tar czf hardware_report-linux-x86_64-${{ needs.create-release.outputs.version }}.tar.gz hardware_report-linux-x86_64
-          sha256sum hardware_report-linux-x86_64-${{ needs.create-release.outputs.version }}.tar.gz > hardware_report-linux-x86_64-${{ needs.create-release.outputs.version }}.tar.gz.sha256
+          tar czf "hardware_report-linux-x86_64-${VERSION}.tar.gz" hardware_report-linux-x86_64
+          sha256sum "hardware_report-linux-x86_64-${VERSION}.tar.gz" > "hardware_report-linux-x86_64-${VERSION}.tar.gz.sha256"
 
-      - name: Upload Release Asset
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
         with:
-          upload_url: ${{ needs.create-release.outputs.upload_url }}
-          asset_path: build/release/hardware_report-linux-x86_64-${{ needs.create-release.outputs.version }}.tar.gz
-          asset_name: hardware_report-linux-x86_64-${{ needs.create-release.outputs.version }}.tar.gz
-          asset_content_type: application/gzip
+          name: linux-release
+          path: |
+            build/release/*.tar.gz
+            build/release/*.sha256
 
-      - name: Upload SHA256 checksum
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ needs.create-release.outputs.upload_url }}
-          asset_path: build/release/hardware_report-linux-x86_64-${{ needs.create-release.outputs.version }}.tar.gz.sha256
-          asset_name: hardware_report-linux-x86_64-${{ needs.create-release.outputs.version }}.tar.gz.sha256
-          asset_content_type: text/plain
-
-  build-debian:
-    needs: create-release
-    runs-on: ubuntu-latest
+  build-linux-arm64:
+    needs: metadata
+    runs-on: blacksmith-2vcpu-ubuntu-2204-arm
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.metadata.outputs.tag }}
 
       - name: Install build dependencies
         run: |
@@ -116,10 +109,13 @@ jobs:
           sudo apt-get install -y \
             build-essential \
             curl \
+            numactl \
+            pciutils \
+            ethtool \
+            dmidecode \
+            ipmitool \
             pkg-config \
-            libssl-dev \
-            dpkg-dev \
-            debhelper
+            libssl-dev
 
       - name: Install Rust toolchain
         uses: actions-rs/toolchain@v1
@@ -128,64 +124,54 @@ jobs:
           override: true
 
       - name: Build release binary
-        run: cargo build --release
-
-      - name: Create Debian package structure
         run: |
-          VERSION=${{ needs.create-release.outputs.version }}
-          mkdir -p debian-pkg/hardware-report_${VERSION}_amd64/{DEBIAN,usr/bin,usr/share/doc/hardware-report}
-          
-          # Copy binary
-          cp target/release/hardware_report debian-pkg/hardware-report_${VERSION}_amd64/usr/bin/
-          
-          # Create control file
-          cat > debian-pkg/hardware-report_${VERSION}_amd64/DEBIAN/control << EOF
-          Package: hardware-report
-          Version: ${VERSION}
-          Architecture: amd64
-          Maintainer: Kenny Sheridan <kenny@sfcompute.com>
-          Description: Hardware information collection tool
-           A tool for generating detailed hardware information reports from Linux servers,
-           outputting the data in TOML format for infrastructure standardization.
-          Depends: numactl, ipmitool, ethtool, util-linux, pciutils
-          Priority: optional
-          Section: utils
-          EOF
-          
-          # Create copyright file
-          cat > debian-pkg/hardware-report_${VERSION}_amd64/usr/share/doc/hardware-report/copyright << EOF
-          Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
-          Upstream-Name: hardware_report
-          Source: https://github.com/sfcompute/hardware_report
-          
-          Files: *
-          Copyright: 2024 Kenny Sheridan
-          License: MIT
-          EOF
-          
-          # Build the package
-          dpkg-deb --build debian-pkg/hardware-report_${VERSION}_amd64
-          mv debian-pkg/hardware-report_${VERSION}_amd64.deb .
-          
-          # Generate checksum
-          sha256sum hardware-report_${VERSION}_amd64.deb > hardware-report_${VERSION}_amd64.deb.sha256
+          cargo build --release
+          mkdir -p build/release
+          cp target/release/hardware_report build/release/hardware_report-linux-aarch64
+          strip build/release/hardware_report-linux-aarch64
 
-      - name: Upload Debian package
-        uses: actions/upload-release-asset@v1
+      - name: Create tarball
+        run: |
+          VERSION="${{ needs.metadata.outputs.version }}"
+          cd build/release
+          tar czf "hardware_report-linux-aarch64-${VERSION}.tar.gz" hardware_report-linux-aarch64
+          sha256sum "hardware_report-linux-aarch64-${VERSION}.tar.gz" > "hardware_report-linux-aarch64-${VERSION}.tar.gz.sha256"
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-arm64-release
+          path: |
+            build/release/*.tar.gz
+            build/release/*.sha256
+
+  attach-assets:
+    needs:
+      - metadata
+      - build-linux
+      - build-linux-arm64
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download Linux x86_64 artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: linux-release
+          path: dist
+
+      - name: Download Linux arm64 artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: linux-arm64-release
+          path: dist
+
+      - name: Upload release assets
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ needs.metadata.outputs.tag }}
+          working_directory: dist
+          fail_on_unmatched_files: true
+          files: |
+            *.tar.gz
+            *.tar.gz.sha256
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ needs.create-release.outputs.upload_url }}
-          asset_path: hardware-report_${{ needs.create-release.outputs.version }}_amd64.deb
-          asset_name: hardware-report_${{ needs.create-release.outputs.version }}_amd64.deb
-          asset_content_type: application/vnd.debian.binary-package
-
-      - name: Upload Debian package checksum
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ needs.create-release.outputs.upload_url }}
-          asset_path: hardware-report_${{ needs.create-release.outputs.version }}_amd64.deb.sha256
-          asset_name: hardware-report_${{ needs.create-release.outputs.version }}_amd64.deb.sha256
-          asset_content_type: text/plain
