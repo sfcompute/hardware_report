@@ -13,19 +13,31 @@ pub enum PostMethod {
 #[derive(Serialize)]
 pub struct PostPayload {
     pub labels: HashMap<String, String>,
+    pub system_id: String,
     pub result: ServerInfo,
+}
+
+fn resolve_system_id(data: &ServerInfo, system_identifier: Option<&str>) -> String {
+    system_identifier
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .map(String::from)
+        .unwrap_or_else(|| data.summary.system_info.uuid.clone())
 }
 
 pub async fn post_data(
     data: ServerInfo,
     labels: HashMap<String, String>,
+    system_identifier: Option<&str>,
     endpoint: &str,
     auth_token: Option<&str>,
     write_payload_to: Option<&str>,
     skip_tls_verify: bool,
 ) -> Result<(), Box<dyn Error>> {
+    let system_id = resolve_system_id(&data, system_identifier);
     let payload = PostPayload {
         labels,
+        system_id,
         result: data,
     };
 

@@ -53,18 +53,26 @@ impl HttpDataPublisher {
         Self::new(Duration::from_secs(30), false)
     }
 
-    /// Create a payload with labels merged in
+    /// Create a payload with `system_id` and optional labels merged in
     fn create_payload(&self, report: &HardwareReport, config: &PublishConfig) -> serde_json::Value {
         let mut payload = serde_json::to_value(report).unwrap_or_else(|_| json!({}));
 
-        // Add labels if provided
-        if !config.labels.is_empty() {
-            if let Some(obj) = payload.as_object_mut() {
+        let system_id = config
+            .system_identifier
+            .as_deref()
+            .map(str::trim)
+            .filter(|s| !s.is_empty())
+            .map(String::from)
+            .unwrap_or_else(|| report.summary.system_info.uuid.clone());
+
+        if let Some(obj) = payload.as_object_mut() {
+            if !config.labels.is_empty() {
                 obj.insert(
                     "labels".to_string(),
                     serde_json::to_value(&config.labels).unwrap_or(json!({})),
                 );
             }
+            obj.insert("system_id".to_string(), json!(system_id));
         }
 
         payload
@@ -249,12 +257,31 @@ mod tests {
             auth_token: None,
             skip_tls_verify: false,
             labels,
+            system_identifier: None,
         };
 
         let payload = publisher.create_payload(&report, &config);
+        assert_eq!(payload["system_id"], "test-uuid");
         assert!(payload.get("labels").is_some());
         assert_eq!(payload["labels"]["environment"], "test");
         assert_eq!(payload["labels"]["datacenter"], "dc1");
+    }
+
+    #[tokio::test]
+    async fn test_create_payload_system_identifier_override() {
+        let publisher = HttpDataPublisher::with_defaults().unwrap();
+        let report = create_test_report();
+
+        let config = PublishConfig {
+            endpoint: "http://example.com".to_string(),
+            auth_token: None,
+            skip_tls_verify: false,
+            labels: HashMap::new(),
+            system_identifier: Some("custom-machine-42".to_string()),
+        };
+
+        let payload = publisher.create_payload(&report, &config);
+        assert_eq!(payload["system_id"], "custom-machine-42");
     }
 
     #[tokio::test]
@@ -266,6 +293,7 @@ mod tests {
             auth_token: None,
             skip_tls_verify: false,
             labels: HashMap::new(),
+            system_identifier: None,
         };
 
         let result = publisher.publish(&report, &config).await;

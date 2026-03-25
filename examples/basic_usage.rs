@@ -47,6 +47,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     post_data(
         server_info,
         labels,
+        None,
         "https://api.example.com/hardware",
         Some("your-auth-token"),
         None,

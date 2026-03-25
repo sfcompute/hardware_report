@@ -744,4 +744,6 @@ pub struct PublishConfig {
     pub skip_tls_verify: bool,
     /// Additional labels/metadata
     pub labels: HashMap<String, String>,
+    /// Override `system_id` in the HTTP JSON payload; if unset, uses `summary.system_info.uuid`
+    pub system_identifier: Option<String>,
 }
