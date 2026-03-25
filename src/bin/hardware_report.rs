@@ -102,9 +102,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
     let opt = Opt::from_args();
 
     if opt.system_identifier.is_some() && !opt.post {
-        return Err(
-            "`--system-identifier` is only valid when posting (`--post`)".into(),
-        );
+        return Err("`--system-identifier` is only valid when posting (`--post`)".into());
     }
 
     // Collect server information
