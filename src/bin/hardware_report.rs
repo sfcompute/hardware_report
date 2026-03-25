@@ -67,6 +67,10 @@ struct Opt {
     #[structopt(long = "label", parse(try_from_str = parse_label))]
     labels: Vec<(String, String)>,
 
+    /// Override `system_id` in the POST JSON body (defaults to DMI system UUID); only valid with --post
+    #[structopt(long)]
+    system_identifier: Option<String>,
+
     /// Output file format (toml or json)
     #[structopt(long, default_value = "toml")]
     _file_format: FileFormat,
@@ -96,6 +100,10 @@ fn parse_label(s: &str) -> Result<(String, String), String> {
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
     let opt = Opt::from_args();
+
+    if opt.system_identifier.is_some() && !opt.post {
+        return Err("`--system-identifier` is only valid when posting (`--post`)".into());
+    }
 
     // Collect server information
     let server_info = ServerInfo::collect()?;
@@ -366,6 +374,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
         post_data(
             server_info,
             labels,
+            opt.system_identifier.as_deref(),
             &opt.endpoint,
             opt.auth_token.as_deref(),
             opt.save_payload.as_deref(),

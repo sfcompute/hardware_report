@@ -8,41 +8,41 @@
 
 ## Production Deployment
 
-### Debian Package (Recommended)
+### Pre-built binary (recommended)
 
 ```bash
-# Download and install
+# Download tarball (x86_64 example; use aarch64 asset names on ARM)
 curl -sL https://api.github.com/repos/sfcompute/hardware_report/releases/latest \
-  | grep "browser_download_url.*\.deb" | cut -d '"' -f 4 | wget -qi -
-sudo apt install -y ./hardware-report_*_amd64.deb
+  | grep "browser_download_url.*hardware_report-linux-x86_64.*\.tar\.gz" | cut -d '"' -f 4 | wget -qi -
+tar xzf hardware_report-linux-x86_64-*.tar.gz
 
-# Run
+# Install to PATH
+sudo install -m 755 hardware_report-linux-x86_64 /usr/local/bin/hardware_report
+
+# Runtime tools (Debian/Ubuntu example)
+sudo apt-get install -y numactl ipmitool ethtool pciutils
+
 sudo hardware_report
 ```
 
-### Multi-Server Deployment with Ansible
+### Multi-server deployment with Ansible
 
 ```bash
-# Deploy package to all servers
-ansible servers -m copy -a "src=hardware-report_*_amd64.deb dest=/tmp/"
-ansible servers -m apt -a "deb=/tmp/hardware-report_*_amd64.deb state=present"
-
-# Run on all servers
-ansible servers -m shell -a "sudo hardware_report" --become
+# After extracting the release tarball locally:
+ansible servers -m copy -a "src=hardware_report-linux-x86_64 dest=/usr/local/bin/hardware_report mode=0755"
+ansible servers -m apt -a "name=numactl,ipmitool,ethtool,pciutils state=present" --become
+ansible servers -m shell -a "sudo /usr/local/bin/hardware_report" --become
 ```
 
-### Binary Deployment
+### Binary deployment (scp)
 
 ```bash
-# Download binary
 curl -sL https://api.github.com/repos/sfcompute/hardware_report/releases/latest \
-  | grep "browser_download_url.*tar.gz" | cut -d '"' -f 4 | wget -qi -
+  | grep "browser_download_url.*hardware_report-linux-x86_64.*\.tar\.gz" | cut -d '"' -f 4 | wget -qi -
 tar xzf hardware_report-linux-x86_64-*.tar.gz
 
-# Deploy to target
-scp hardware_report-linux-x86_64 user@target:/usr/local/bin/hardware_report
-
-# Ensure runtime dependencies on target
+scp hardware_report-linux-x86_64 user@target:/tmp/
+ssh user@target "sudo install -m 755 /tmp/hardware_report-linux-x86_64 /usr/local/bin/hardware_report"
 ssh user@target "sudo apt-get install -y numactl ipmitool ethtool pciutils"
 ```
 
